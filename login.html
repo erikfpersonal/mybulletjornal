@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meu Dia — Entrar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f2;--surface:#fff;--border:#e4e2da;
+  --text:#1a1a18;--muted:#8a8880;--hint:#b8b6ae;
+  --serif:'DM Serif Display',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+  --error:#a33a2d;
+}
+
+html,body{
+  height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:15px;
+}
+
+/* ── LAYOUT ── */
+.wrap{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:2rem 1.5rem;
+}
+
+/* ── CARD ── */
+.card{
+  width:100%;
+  max-width:400px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:2.5rem 2.25rem;
+}
+
+/* ── HEADER ── */
+.brand{
+  text-align:center;
+  margin-bottom:2.25rem;
+}
+
+.brand-title{
+  font-family:var(--serif);
+  font-size:28px;
+  font-weight:400;
+  color:var(--text);
+  line-height:1.15;
+}
+
+.brand-sub{
+  font-size:12px;
+  color:var(--hint);
+  font-weight:300;
+  margin-top:.4rem;
+}
+
+/* ── TABS ── */
+.tabs{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  margin-bottom:1.75rem;
+}
+
+.tab{
+  flex:1;
+  text-align:center;
+  padding:.65rem 0;
+  font-size:13px;
+  color:var(--muted);
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  transition:color .15s,border-color .15s;
+  font-weight:400;
+  user-select:none;
+}
+
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--text);border-bottom-color:var(--text);font-weight:500;}
+
+/* ── FORM ── */
+.form{display:flex;flex-direction:column;gap:1rem;}
+.form.hidden{display:none;}
+
+.field{display:flex;flex-direction:column;gap:.3rem;}
+
+.field label{
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  color:var(--muted);
+  font-weight:500;
+}
+
+.field input{
+  border:none;
+  border-bottom:1px solid var(--border);
+  background:transparent;
+  font-family:var(--sans);
+  font-size:14px;
+  color:var(--text);
+  outline:none;
+  padding:.45rem 0;
+  transition:border-color .15s;
+  width:100%;
+}
+
+.field input:focus{border-bottom-color:var(--text);}
+.field input::placeholder{color:var(--hint);}
+
+/* ── SUBMIT ── */
+.submit-btn{
+  margin-top:.5rem;
+  width:100%;
+  padding:.75rem;
+  background:var(--text);
+  color:white;
+  border:none;
+  border-radius:6px;
+  font-family:var(--sans);
+  font-size:14px;
+  font-weight:500;
+  cursor:pointer;
+  transition:opacity .15s;
+  letter-spacing:.02em;
+}
+
+.submit-btn:hover{opacity:.85;}
+.submit-btn:active{opacity:.7;}
+
+/* ── ERROR / SUCCESS ── */
+.msg{
+  font-size:12px;
+  text-align:center;
+  margin-top:.25rem;
+  min-height:16px;
+  font-weight:300;
+}
+.msg.error{color:var(--error);}
+.msg.success{color:#3b7a3e;}
+
+/* ── DIVIDER ── */
+.or{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+  margin:.25rem 0;
+  color:var(--hint);
+  font-size:11px;
+}
+.or::before,.or::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── FOOTER ── */
+.footer{
+  margin-top:2rem;
+  font-size:11px;
+  color:var(--hint);
+  text-align:center;
+  font-weight:300;
+}
+
+/* ── LOADING SPINNER ── */
+.spinner{
+  display:none;
+  width:16px;height:16px;
+  border:2px solid rgba(255,255,255,.3);
+  border-top-color:white;
+  border-radius:50%;
+  animation:spin .6s linear infinite;
+  margin:0 auto;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.submit-btn.loading .btn-label{display:none;}
+.submit-btn.loading .spinner{display:block;}
+
+/* ── ANIMATE IN ── */
+.card{animation:slideUp .3s ease both;}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="card">
+
+    <!-- BRAND -->
+    <div class="brand">
+      <div class="brand-title">My Bullet Journal</div>
+      <div class="brand-sub">seu espaço de produtividade diária</div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" data-tab="login" onclick="switchTab('login')">Entrar</div>
+      <div class="tab" data-tab="register" onclick="switchTab('register')">Criar conta</div>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <form class="form" id="form-login" onsubmit="handleLogin(event)">
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <div class="msg" id="login-msg"></div>
+      <button type="submit" class="submit-btn" id="login-btn">
+        <span class="btn-label">Entrar</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+    <!-- REGISTER FORM -->
+    <form class="form hidden" id="form-register" onsubmit="handleRegister(event)">
+      <div class="field">
+        <label>Nome</label>
+        <input type="text" id="reg-name" placeholder="Como quer ser chamado?" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password" minlength="6" required>
+      </div>
+      <div class="field">
+        <label>Confirmar senha</label>
+        <input type="password" id="reg-pass2" placeholder="Repita a senha" autocomplete="new-password" minlength="6" required>
+      </div>
+      <div class="msg" id="reg-msg"></div>
+      <button type="submit" class="submit-btn" id="reg-btn">
+        <span class="btn-label">Criar conta</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+  </div>
+
+  <div class="footer">Seus dados ficam salvos com segurança.</div>
+</div>
+
+<script>
+// ── TAB SWITCH ──
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('form-login').classList.toggle('hidden', tab!=='login');
+  document.getElementById('form-register').classList.toggle('hidden', tab!=='register');
+  document.getElementById('login-msg').textContent='';
+  document.getElementById('reg-msg').textContent='';
+}
+
+// ── LOADING STATE ──
+function setLoading(btnId, on){
+  document.getElementById(btnId).classList.toggle('loading', on);
+  document.getElementById(btnId).disabled = on;
+}
+
+function showMsg(id, text, type){
+  const el=document.getElementById(id);
+  el.textContent=text;
+  el.className='msg '+(type||'');
+}
+
+// ── LOGIN ──
+async function handleLogin(e){
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+
+  setLoading('login-btn', true);
+  showMsg('login-msg','','');
+
+  try{
+    // ── SUPABASE: substituir URL e ANON KEY ──
+    // const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    // if(error) throw error;
+    // window.location.href = 'produtividade.html';
+
+    // DEMO: simula login sem Supabase
+    await new Promise(r=>setTimeout(r,900));
+    if(email && pass.length >= 6){
+      localStorage.setItem('userName', email.split('@')[0]);
+      showMsg('login-msg','Entrando...','success');
+      setTimeout(()=>{ window.location.href='produtividade.html'; }, 600);
+    } else {
+      throw new Error('E-mail ou senha incorretos.');
+    }
+  } catch(err){
+    showMsg('login-msg', err.message || 'Erro ao entrar. Tente novamente.','error');
+    setLoading('login-btn', false);
+  }
+}
+
+// ── REGISTER ──
+async function handleRegister(e){
+  e.preventDefault();
+  const name  = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass  = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+
+  if(pass !== pass2){
+    showMsg('reg-msg','As senhas não coincidem.','error');
+    return;
+  }
+
+  setLoading('reg-btn', true);
+  showMsg('reg-msg','','');
+
+  try{
+    // ── SUPABASE: substituir URL e ANON KEY ──
+    // const { data, error } = await supabase.auth.signUp({ email, password: pass, options:{ data:{ name } } });
+    // if(error) throw error;
+    // localStorage.setItem('userName', name);
+    // window.location.href = 'produtividade.html';
+
+    // DEMO: simula cadastro sem Supabase
+    await new Promise(r=>setTimeout(r,1000));
+    localStorage.setItem('userName', name);
+    showMsg('reg-msg','Conta criada! Redirecionando...','success');
+    setTimeout(()=>{ window.location.href='produtividade.html'; }, 800);
+  } catch(err){
+    showMsg('reg-msg', err.message || 'Erro ao criar conta. Tente novamente.','error');
+    setLoading('reg-btn', false);
+  }
+}
+</script>
+</body>
+</html>

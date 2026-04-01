@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meu Dia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f2;--surface:#fff;--border:#e4e2da;
+  --text:#1a1a18;--muted:#8a8880;--hint:#b8b6ae;
+  --serif:'DM Serif Display',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px}
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:2rem 0}
+.sidebar-brand{padding:0 1.5rem 1.75rem;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+.sidebar-brand h1{font-family:var(--serif);font-size:17px;font-weight:400;line-height:1.25}
+.sidebar-brand p{font-size:11px;color:var(--muted);margin-top:2px;font-weight:300}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 1.5rem;cursor:pointer;font-size:13.5px;color:var(--muted);border-left:2px solid transparent;transition:color .15s,border-color .15s;user-select:none}
+.nav-item:hover{color:var(--text)}
+.nav-item.active{color:var(--text);border-left-color:var(--text);font-weight:500}
+.nav-num{font-size:10px;color:var(--hint);width:14px;font-weight:300}
+.sidebar-footer{margin-top:auto;padding:1.25rem 1.5rem 0;border-top:1px solid var(--border)}
+.sidebar-date{font-size:11px;color:var(--muted);font-weight:300;line-height:1.6}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;padding:2.5rem 3rem;max-width:780px}
+.page{display:none}
+.page.active{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.page-header{margin-bottom:2rem}
+.page-header h2{font-family:var(--serif);font-size:26px;font-weight:400}
+.page-header p{font-size:12px;color:var(--muted);margin-top:4px;font-weight:300}
+.divider{height:1px;background:var(--border);margin-bottom:2rem}
+
+/* TASKS */
+.category-block{margin-bottom:2rem}
+.category-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.75rem;font-weight:500}
+.task-list{display:flex;flex-direction:column}
+.task-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.task-item:last-of-type{border-bottom:none}
+.task-item.dragging{opacity:.35}
+.task-item.drag-over{border-top:2px solid var(--text);margin-top:-1px}
+.drag-handle{font-size:12px;color:var(--hint);cursor:grab;opacity:0;transition:opacity .15s;flex-shrink:0;user-select:none}
+.task-item:hover .drag-handle{opacity:1}
+.task-check{width:16px;height:16px;border:1px solid var(--border);border-radius:50%;cursor:pointer;flex-shrink:0;transition:background .15s,border-color .15s;display:flex;align-items:center;justify-content:center}
+.task-check.done{background:var(--text);border-color:var(--text)}
+.task-check.done::after{content:'';width:5px;height:5px;background:white;border-radius:50%}
+.task-text{flex:1;font-size:14px;color:var(--text);outline:none;border:none;background:transparent;font-family:var(--sans);line-height:1.4}
+.task-text.done-text{color:var(--hint);text-decoration:line-through}
+.task-del{font-size:16px;color:var(--hint);cursor:pointer;opacity:0;background:none;border:none;padding:0 2px;line-height:1;transition:opacity .15s}
+.task-item:hover .task-del{opacity:1}
+.inline-add{display:flex;align-items:center;gap:10px;padding:9px 0}
+.inline-add-icon{width:16px;height:16px;border:1px dashed var(--hint);border-radius:50%;flex-shrink:0}
+.inline-add input{flex:1;border:none;background:transparent;font-family:var(--sans);font-size:14px;color:var(--muted);outline:none}
+.inline-add input::placeholder{color:var(--hint)}
+
+/* SEMANA CALENDAR */
+.week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.week-nav-label{font-size:13px;color:var(--muted);font-weight:300}
+.week-nav-btns{display:flex;gap:6px;align-items:center}
+.week-nav-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px;color:var(--muted);font-family:var(--sans);transition:color .15s,border-color .15s}
+.week-nav-btn:hover{color:var(--text);border-color:var(--text)}
+.week-nav-btn.today-btn{font-size:11px}
+.week-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:2rem}
+.week-cal-day{display:flex;flex-direction:column;align-items:center;padding:10px 4px 8px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:background .15s,border-color .15s;user-select:none}
+.week-cal-day:hover{background:var(--bg)}
+.week-cal-day.today-cal{border-color:var(--text)}
+.week-cal-day.selected{background:var(--text);border-color:var(--text)}
+.week-cal-name{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
+.week-cal-num{font-size:18px;font-family:var(--serif);color:var(--text);line-height:1}
+.week-cal-dot{width:4px;height:4px;border-radius:50%;background:var(--hint);margin-top:5px}
+.week-cal-day.selected .week-cal-name,.week-cal-day.selected .week-cal-num{color:white}
+.week-cal-day.selected .week-cal-dot{background:rgba(255,255,255,.5)}
+.week-day-title{font-family:var(--serif);font-size:20px;font-weight:400;margin-bottom:.2rem}
+.week-day-sub{font-size:12px;color:var(--muted);font-weight:300;margin-bottom:1.5rem}
+
+/* HABITOS */
+.habits-table-wrap{overflow-x:auto;margin-bottom:2.5rem}
+table.habits-table{width:100%;border-collapse:collapse;font-size:12px}
+.habits-table th,.habits-table td{border:1px solid var(--border);text-align:center;padding:0}
+.habits-table th{background:var(--bg);color:var(--muted);font-weight:400;font-size:10px;padding:5px 4px}
+.habits-table td.habit-name{text-align:left;padding:0 8px;font-size:12px;min-width:110px;white-space:nowrap}
+.habit-cell{width:22px;height:28px;cursor:pointer;transition:background .1s}
+.habit-cell.checked{background:var(--text)}
+.habit-cell.today-col{background:#f0efe9}
+.habit-cell.checked.today-col{background:var(--text)}
+.habit-add-row td{padding:6px 8px;text-align:left}
+.habit-add-input{border:none;background:transparent;font-family:var(--sans);font-size:12px;color:var(--muted);outline:none;width:100%}
+.habit-add-input::placeholder{color:var(--hint)}
+
+/* SONO */
+.sono-section{margin-top:2.5rem}
+.sono-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.25rem;font-weight:500}
+.sono-chart-wrap{width:100%;overflow-x:auto;margin-bottom:2rem}
+#sono-chart{display:block}
+.sono-inputs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px 12px}
+.sono-input-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)}
+.sono-day{font-size:10px;color:var(--muted);width:28px;flex-shrink:0}
+.sono-input{border:none;background:transparent;font-family:var(--sans);font-size:11px;color:var(--text);outline:none;text-align:center;padding:1px 0;width:52px;flex-shrink:0}
+.sono-sep{font-size:10px;color:var(--hint)}
+.sono-total{font-size:10px;color:var(--muted);margin-left:auto}
+.sono-total.good{color:#3b7a3e}
+.sono-total.bad{color:#a33a2d}
+
+/* GRATIDÃO */
+.gratitude-list{display:flex;flex-direction:column}
+.gratitude-row{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--border)}
+.gratitude-row:last-of-type{border-bottom:none}
+.gratitude-day{font-size:11px;color:var(--muted);font-weight:300;padding-top:2px}
+.gratitude-input{border:none;background:transparent;font-family:var(--sans);font-size:13.5px;color:var(--text);outline:none;width:100%;resize:none;line-height:1.5;min-height:22px}
+.gratitude-input::placeholder{color:var(--hint)}
+
+/* DIÁRIO */
+.diary-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
+.diary-nav-center{display:flex;align-items:center;gap:12px}
+.diary-date-label{font-family:var(--serif);font-size:18px;font-weight:400}
+.diary-arrow{background:none;border:1px solid var(--border);border-radius:4px;padding:5px 12px;cursor:pointer;font-size:14px;color:var(--muted);transition:color .15s,border-color .15s;font-family:var(--sans)}
+.diary-arrow:hover{color:var(--text);border-color:var(--text)}
+.diary-today-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:11px;color:var(--muted);font-family:var(--sans);transition:color .15s,border-color .15s}
+.diary-today-btn:hover{color:var(--text);border-color:var(--text)}
+
+/* mini calendar */
+.diary-cal-wrap{position:relative;display:inline-block}
+.diary-cal-btn{background:none;border:1px solid var(--border);border-radius:4px;padding:5px 10px;cursor:pointer;font-size:11px;color:var(--muted);font-family:var(--sans);transition:color .15s,border-color .15s}
+.diary-cal-btn:hover{color:var(--text);border-color:var(--text)}
+.diary-mini-cal{position:absolute;top:calc(100% + 8px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;z-index:100;width:240px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.diary-mini-cal.hidden{display:none}
+.mini-cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.mini-cal-title{font-size:12px;font-weight:500;color:var(--text)}
+.mini-cal-nav{background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);padding:2px 6px;transition:color .15s}
+.mini-cal-nav:hover{color:var(--text)}
+.mini-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.mini-cal-dow{font-size:9px;color:var(--hint);text-align:center;padding:2px 0;text-transform:uppercase}
+.mini-cal-cell{font-size:11px;text-align:center;padding:4px 2px;border-radius:4px;cursor:pointer;color:var(--muted);transition:background .1s,color .1s}
+.mini-cal-cell:hover{background:var(--bg);color:var(--text)}
+.mini-cal-cell.has-entry{color:var(--text);font-weight:500}
+.mini-cal-cell.selected-day{background:var(--text);color:white}
+.mini-cal-cell.empty{cursor:default}
+
+/* scale buttons */
+.scale-row{display:flex;align-items:center;gap:6px;margin-bottom:1.25rem}
+.scale-label{font-size:12px;color:var(--muted);width:80px;flex-shrink:0}
+.scale-btns{display:flex;gap:4px}
+.scale-btn{width:28px;height:28px;border:1px solid var(--border);border-radius:50%;background:transparent;font-family:var(--sans);font-size:12px;color:var(--muted);cursor:pointer;transition:background .15s,color .15s,border-color .15s;display:flex;align-items:center;justify-content:center}
+.scale-btn.on{background:var(--text);color:white;border-color:var(--text)}
+
+/* diary sections */
+.diary-section{margin-bottom:1.75rem;border-bottom:1px solid var(--border);padding-bottom:1.5rem}
+.diary-section:last-of-type{border-bottom:none}
+.diary-section-title{font-size:11px;font-weight:500;color:var(--text);margin-bottom:.75rem;display:flex;align-items:center;gap:6px}
+.diary-section-icon{font-size:14px}
+.diary-field{margin-bottom:.75rem}
+.diary-field-label{font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.diary-textarea{width:100%;border:none;background:transparent;font-family:var(--sans);font-size:13.5px;color:var(--text);outline:none;resize:none;line-height:1.6;min-height:28px}
+.diary-textarea::placeholder{color:var(--hint)}
+
+/* RELATÓRIO */
+.report-month-select{display:flex;align-items:center;gap:10px;margin-bottom:2rem}
+.report-month-select select{border:1px solid var(--border);background:var(--surface);font-family:var(--sans);font-size:13px;color:var(--text);padding:6px 10px;border-radius:6px;outline:none;cursor:pointer}
+.report-section{margin-bottom:2.5rem}
+.report-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem;font-weight:500}
+.report-habit-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.report-habit-row:last-of-type{border-bottom:none}
+.report-bar-wrap{flex:1;margin:0 16px;height:4px;background:var(--border);border-radius:2px}
+.report-bar{height:4px;background:var(--text);border-radius:2px;transition:width .4s ease}
+.report-pct{font-size:11px;color:var(--muted);width:30px;text-align:right}
+.report-sleep-avg{display:flex;gap:2rem}
+.report-stat{display:flex;flex-direction:column}
+.report-stat-num{font-family:var(--serif);font-size:28px}
+.report-stat-label{font-size:11px;color:var(--muted);font-weight:300}
+.report-gratitude-list{display:flex;flex-direction:column}
+.report-gratitude-entry{display:grid;grid-template-columns:28px 1fr;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)}
+.report-gratitude-entry:last-of-type{border-bottom:none}
+.report-g-day{color:var(--muted);font-size:11px;padding-top:1px}
+
+/* CONFIG */
+.config-section{margin-bottom:2.5rem}
+.config-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem;font-weight:500}
+.config-tag-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:.75rem}
+.config-tag{display:flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;font-size:12px;background:var(--surface)}
+.config-tag-del{font-size:14px;color:var(--hint);cursor:pointer;border:none;background:none;padding:0;line-height:1;transition:color .15s}
+.config-tag-del:hover{color:var(--text)}
+.config-add-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.config-input{border:none;border-bottom:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:13px;color:var(--text);outline:none;padding:4px 0;flex:1;min-width:140px;max-width:220px}
+.config-input::placeholder{color:var(--hint)}
+.config-btn{font-family:var(--sans);font-size:12px;color:var(--muted);border:1px solid var(--border);background:transparent;padding:5px 14px;border-radius:4px;cursor:pointer;transition:color .15s,border-color .15s;white-space:nowrap}
+.config-btn:hover{color:var(--text);border-color:var(--text)}
+.config-habit-list{display:flex;flex-direction:column}
+.config-habit-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.config-habit-item:last-of-type{border-bottom:none}
+.recur-list{display:flex;flex-direction:column;margin-bottom:1rem}
+.recur-item{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:12px}
+.recur-item:last-of-type{border-bottom:none}
+.recur-item-name{font-size:13px;color:var(--text)}
+.recur-item-cat{font-size:10px;color:var(--hint);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.recur-item-days{font-size:11px;color:var(--muted);margin-top:3px}
+.recur-form-box{border:1px solid var(--border);border-radius:8px;padding:1rem}
+.recur-form-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500;margin-bottom:.75rem}
+.recur-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:.75rem}
+.recur-cat-sel{border:none;border-bottom:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:13px;color:var(--text);outline:none;padding:4px 0;min-width:120px}
+.recur-days-picker{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.75rem}
+.dow-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:11px;color:var(--muted);cursor:pointer;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center}
+.dow-btn.on{background:var(--text);color:white;border-color:var(--text)}
+
+/* EXPORT */
+.export-box{border:1px solid var(--border);border-radius:8px;padding:1.25rem;display:flex;flex-direction:column;gap:12px}
+.export-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.export-select{border:1px solid var(--border);background:var(--surface);font-family:var(--sans);font-size:13px;color:var(--text);padding:5px 10px;border-radius:4px;outline:none;cursor:pointer}
+.export-btn{font-family:var(--sans);font-size:12px;color:var(--surface);border:none;background:var(--text);padding:6px 16px;border-radius:4px;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+.export-btn:hover{opacity:.8}
+.export-btn-sm{font-family:var(--sans);font-size:11px;color:var(--muted);border:1px solid var(--border);background:transparent;padding:3px 10px;border-radius:4px;cursor:pointer;transition:color .15s,border-color .15s;white-space:nowrap}
+.export-btn-sm:hover{color:var(--text);border-color:var(--text)}
+.export-desc{font-size:11px;color:var(--muted);font-weight:300}
+.month-checks{display:flex;flex-wrap:wrap;gap:6px}
+.month-check-btn{font-family:var(--sans);font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--muted);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.month-check-btn.on{background:var(--text);color:white;border-color:var(--text)}
+
+/* SCROLLBAR */
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-track{background:transparent}
+.main::-webkit-scrollbar-thumb{background:var(--hint);border-radius:2px}
+
+/* PRINT STYLES */
+@media print{
+  .sidebar,.no-print{display:none!important}
+  .app{display:block}
+  .main{max-width:100%;padding:0;overflow:visible}
+  .page{display:none}
+  .page.print-active{display:block!important}
+  body{background:white}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h1 id="brand-greeting">Meu Dia</h1>
+    <p id="sb-date"></p>
+  </div>
+  <nav id="nav">
+    <div class="nav-item active" data-page="hoje"><span class="nav-num">01</span> Hoje</div>
+    <div class="nav-item" data-page="semana"><span class="nav-num">02</span> Semana</div>
+    <div class="nav-item" data-page="habitos"><span class="nav-num">03</span> Hábitos & Sono</div>
+    <div class="nav-item" data-page="gratidao"><span class="nav-num">04</span> Gratidão</div>
+    <div class="nav-item" data-page="diario"><span class="nav-num">05</span> Diário</div>
+    <div class="nav-item" data-page="relatorio"><span class="nav-num">06</span> Relatório</div>
+    <div class="nav-item" data-page="config"><span class="nav-num">07</span> Configurações</div>
+  </nav>
+  <div class="sidebar-footer"><p class="sidebar-date" id="sb-week"></p></div>
+</aside>
+
+<main class="main">
+
+  <!-- HOJE -->
+  <div class="page active" id="page-hoje">
+    <div class="page-header">
+      <h2 id="hoje-title">Hoje</h2>
+      <p id="hoje-sub"></p>
+    </div>
+    <div class="divider"></div>
+    <div id="hoje-categories"></div>
+  </div>
+
+  <!-- SEMANA -->
+  <div class="page" id="page-semana">
+    <div class="page-header">
+      <h2>Semana</h2>
+      <p id="semana-sub"></p>
+    </div>
+    <div class="divider"></div>
+    <div class="week-nav">
+      <div class="week-nav-btns">
+        <button class="week-nav-btn" onclick="shiftWeek(-1)">← Anterior</button>
+        <button class="week-nav-btn today-btn" onclick="goToCurrentWeek()">Hoje</button>
+        <button class="week-nav-btn" onclick="shiftWeek(1)">Próxima →</button>
+      </div>
+      <span class="week-nav-label" id="week-range-label"></span>
+    </div>
+    <div class="week-cal" id="week-cal"></div>
+    <div class="week-day-title" id="week-sel-title"></div>
+    <div class="week-day-sub" id="week-sel-sub"></div>
+    <div id="week-day-cats"></div>
+  </div>
+
+  <!-- HÁBITOS & SONO -->
+  <div class="page" id="page-habitos">
+    <div class="page-header">
+      <h2>Hábitos & Sono</h2>
+      <p id="habitos-sub"></p>
+    </div>
+    <div class="divider"></div>
+    <div class="habits-table-wrap">
+      <table class="habits-table"><thead id="habits-thead"></thead><tbody id="habits-tbody"></tbody></table>
+    </div>
+    <div class="sono-section">
+      <div class="sono-label">Rastreamento do Sono</div>
+      <div class="sono-chart-wrap"><svg id="sono-chart" height="160"></svg></div>
+      <div class="sono-inputs-grid" id="sono-grid"></div>
+    </div>
+  </div>
+
+  <!-- GRATIDÃO -->
+  <div class="page" id="page-gratidao">
+    <div class="page-header">
+      <h2>Gratidão</h2>
+      <p id="gratidao-sub"></p>
+    </div>
+    <div class="divider"></div>
+    <div class="gratitude-list" id="gratitude-list"></div>
+  </div>
+
+  <!-- DIÁRIO -->
+  <div class="page" id="page-diario">
+    <div class="page-header">
+      <h2>Diário</h2>
+      <p>Reflexão diária estruturada</p>
+    </div>
+    <div class="divider"></div>
+
+    <div class="diary-nav no-print">
+      <button class="diary-arrow" onclick="diaryShift(-1)">←</button>
+      <div class="diary-nav-center">
+        <div class="diary-cal-wrap">
+          <button class="diary-cal-btn" onclick="toggleDiaryCal()">Calendário</button>
+          <div class="diary-mini-cal hidden" id="diary-mini-cal"></div>
+        </div>
+        <div class="diary-date-label" id="diary-date-label"></div>
+        <button class="diary-today-btn" onclick="diaryGoToday()">Hoje</button>
+      </div>
+      <button class="diary-arrow" onclick="diaryShift(1)">→</button>
+    </div>
+
+    <div id="diary-entry-wrap"></div>
+  </div>
+
+  <!-- RELATÓRIO -->
+  <div class="page" id="page-relatorio">
+    <div class="page-header">
+      <h2>Relatório</h2>
+      <p>Resumo mensal de hábitos, sono e gratidão</p>
+    </div>
+    <div class="divider"></div>
+    <div class="report-month-select"><select id="report-month-sel"></select></div>
+    <div class="report-section"><div class="report-section-title">Hábitos</div><div id="report-habits"></div></div>
+    <div class="report-section"><div class="report-section-title">Sono</div><div class="report-sleep-avg" id="report-sleep"></div></div>
+    <div class="report-section"><div class="report-section-title">Gratidão</div><div class="report-gratitude-list" id="report-gratitude"></div></div>
+  </div>
+
+  <!-- CONFIGURAÇÕES -->
+  <div class="page" id="page-config">
+    <div class="page-header">
+      <h2>Configurações</h2>
+      <p>Categorias, hábitos, tarefas recorrentes e exportações</p>
+    </div>
+    <div class="divider"></div>
+
+    <div class="config-section">
+      <div class="config-section-title">Categorias (Hoje & Semana)</div>
+      <div class="config-tag-list" id="cat-list"></div>
+      <div class="config-add-row">
+        <input class="config-input" id="cat-input" placeholder="Nova categoria..." maxlength="30">
+        <button class="config-btn" onclick="addCategory()">Adicionar</button>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-section-title">Hábitos</div>
+      <div class="config-habit-list" id="habit-list-config"></div>
+      <div class="config-add-row" style="margin-top:.75rem">
+        <input class="config-input" id="habit-input" placeholder="Novo hábito..." maxlength="30">
+        <button class="config-btn" onclick="addHabit()">Adicionar</button>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-section-title">Tarefas Recorrentes</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:1rem;font-weight:300">Aparecem automaticamente no Hoje e na Semana nos dias selecionados.</p>
+      <div class="recur-list" id="recur-list"></div>
+      <div class="recur-form-box">
+        <div class="recur-form-title">Nova tarefa recorrente</div>
+        <div class="recur-row">
+          <input class="config-input" id="recur-name" placeholder="Nome da tarefa..." maxlength="50">
+          <select class="recur-cat-sel" id="recur-cat"></select>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Dias da semana</div>
+        <div class="recur-days-picker" id="recur-picker"></div>
+        <button class="config-btn" style="margin-top:.5rem" onclick="addRecurring()">Adicionar</button>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <div class="config-section-title">Exportar PDF</div>
+      <div class="export-box">
+
+        <!-- DIÁRIO -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="font-size:12px;font-weight:500;color:var(--text)">Diário</div>
+            <button class="export-btn-sm" onclick="exportDiaryPDF('all')">Exportar tudo</button>
+          </div>
+          <div class="export-desc" style="margin-bottom:10px">Selecione um ou mais meses (somente dias preenchidos).</div>
+          <div class="month-checks" id="diary-month-checks"></div>
+          <div style="margin-top:10px">
+            <button class="export-btn" onclick="exportDiaryPDF('selected')">Exportar Diário</button>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:1rem">
+          <!-- RELATÓRIO -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="font-size:12px;font-weight:500;color:var(--text)">Relatório</div>
+            <button class="export-btn-sm" onclick="exportReportPDF('all')">Exportar tudo</button>
+          </div>
+          <div class="export-desc" style="margin-bottom:10px">Selecione um ou mais meses.</div>
+          <div class="month-checks" id="report-month-checks"></div>
+          <div style="margin-top:10px">
+            <button class="export-btn" onclick="exportReportPDF('selected')">Exportar Relatório</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /config -->
+
+</main>
+</div>
+
+<script>
+// ═══════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════
+const now = new Date();
+const todayDate = now.getDate();
+const currentMonth = now.getMonth();
+const currentYear = now.getFullYear();
+
+const DIAS_PT   = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+const MESES_PT  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DOW_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const WEEK_SHORT = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+
+// ═══════════════════════════════
+//  STORAGE
+// ═══════════════════════════════
+function load(k,d){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):d;}catch(e){return d;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function uid(){return Math.random().toString(36).slice(2,9);}
+
+let categories = load('categories',['Profissional','Saúde','Pessoal']);
+let habits     = load('habits',['Exercício','Meditação','Leitura']);
+let todayTasks = load('todayTasks',{});
+let weekTasks  = load('weekTasks',{});
+let habitData  = load('habitData',{});
+let sonoData   = load('sonoData',{});
+let gratData   = load('gratData',{});
+let recurring  = load('recurring',[]);
+// diaryData: { 'Y-M-D': { energia:0, humor:0, aconteceu:'', relevante:'', aprendizado:'', padrao:'', acao:'', proximaAcao:'', ideiasConteudo:'', ideiasNegocio:'', ideiasMP:'' } }
+let diaryData  = load('diaryData',{});
+
+// ═══════════════════════════════
+//  DATES / HELPERS
+// ═══════════════════════════════
+function daysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+function fmtDate(y,m,d){return `${y}-${m}-${d}`;}
+function getWeekNumber(d){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);
+  const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
+  return Math.ceil((((dt-ys)/86400000)+1)/7);
+}
+
+// weekOffset: 0 = current week, -1 = last, etc.
+let weekOffset = 0;
+function getWeekDates(offset){
+  offset = offset||0;
+  const base = new Date(now);
+  base.setDate(now.getDate() + offset*7);
+  const day = base.getDay();
+  const diff = day===0?-6:1-day;
+  const mon = new Date(base); mon.setDate(base.getDate()+diff);
+  return Array.from({length:7},(_,i)=>{const x=new Date(mon);x.setDate(mon.getDate()+i);return x;});
+}
+
+// ═══════════════════════════════
+//  RECURRING INJECTION
+// ═══════════════════════════════
+function injectRecurring(){
+  const todayDow = now.getDay();
+  recurring.forEach(r=>{
+    if(!r.days.includes(todayDow)) return;
+    const cat=r.category||(categories[0]||'Geral');
+    if(!todayTasks[cat]) todayTasks[cat]=[];
+    if(!todayTasks[cat].find(t=>t.recurId===r.id))
+      todayTasks[cat].push({id:uid(),recurId:r.id,text:r.text,done:false});
+  });
+  save('todayTasks',todayTasks);
+  getWeekDates(weekOffset).forEach(date=>{
+    const dow=date.getDay();
+    const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
+    if(!weekTasks[key]) weekTasks[key]={};
+    recurring.forEach(r=>{
+      if(!r.days.includes(dow)) return;
+      const cat=r.category||(categories[0]||'Geral');
+      if(!weekTasks[key][cat]) weekTasks[key][cat]=[];
+      if(!weekTasks[key][cat].find(t=>t.recurId===r.id))
+        weekTasks[key][cat].push({id:uid(),recurId:r.id,text:r.text,done:false});
+    });
+  });
+  save('weekTasks',weekTasks);
+}
+
+// ═══════════════════════════════
+//  SIDEBAR / DATES
+// ═══════════════════════════════
+function initDates(){
+  const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  document.getElementById('sb-date').textContent=`${DIAS_PT[now.getDay()]}, ${now.getDate()} de ${meses[currentMonth]}`;
+  document.getElementById('sb-week').textContent=`Semana ${getWeekNumber(now)} · ${currentYear}`;
+  document.getElementById('hoje-title').textContent=DIAS_PT[now.getDay()];
+  document.getElementById('hoje-sub').textContent=`${now.getDate()} de ${MESES_PT[currentMonth].toLowerCase()} de ${currentYear}`;
+  document.getElementById('habitos-sub').textContent=`${MESES_PT[currentMonth]} ${currentYear}`;
+  document.getElementById('gratidao-sub').textContent=`${MESES_PT[currentMonth]} ${currentYear}`;
+  // greeting
+  const userName=localStorage.getItem('userName');
+  const hour=now.getHours();
+  const saudacao=hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite';
+  document.getElementById('brand-greeting').textContent=userName?`${saudacao}, ${userName}`:'Meu Dia';
+}
+
+// ═══════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════
+document.getElementById('nav').addEventListener('click',e=>{
+  const item=e.target.closest('.nav-item');if(!item)return;
+  const pg=item.dataset.page;
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  item.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+pg).classList.add('active');
+  if(pg==='semana'){renderWeekCal();renderWeekDayTasks();}
+  if(pg==='relatorio') renderReport();
+  if(pg==='diario') renderDiaryEntry();
+});
+
+// ═══════════════════════════════
+//  DRAG & DROP
+// ═══════════════════════════════
+let dragSrc=null;
+function makeDraggable(item){
+  item.draggable=true;
+  item.addEventListener('dragstart',e=>{dragSrc=item;item.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+  item.addEventListener('dragend',()=>{item.classList.remove('dragging');document.querySelectorAll('.task-item').forEach(el=>el.classList.remove('drag-over'));dragSrc=null;});
+  item.addEventListener('dragover',e=>{e.preventDefault();if(dragSrc&&dragSrc!==item&&item.classList.contains('task-item')){document.querySelectorAll('.task-item').forEach(el=>el.classList.remove('drag-over'));item.classList.add('drag-over');}});
+  item.addEventListener('drop',e=>{
+    e.preventDefault();item.classList.remove('drag-over');
+    if(!dragSrc||dragSrc===item)return;
+    const list=item.parentElement;
+    const items=[...list.querySelectorAll('.task-item')];
+    const si=items.indexOf(dragSrc),ti=items.indexOf(item);
+    if(si===-1||ti===-1)return;
+    if(si<ti) list.insertBefore(dragSrc,item.nextSibling); else list.insertBefore(dragSrc,item);
+    persistOrder(list);
+  });
+}
+function persistOrder(listEl){
+  const cat=listEl.dataset.cat;if(!cat)return;
+  const key=listEl.dataset.daykey;
+  const ids=[...listEl.querySelectorAll('.task-item')].map(el=>el.dataset.tid).filter(Boolean);
+  if(key){if(weekTasks[key]&&weekTasks[key][cat]){weekTasks[key][cat]=ids.map(id=>weekTasks[key][cat].find(t=>t.id===id)).filter(Boolean);save('weekTasks',weekTasks);}}
+  else{if(todayTasks[cat]){todayTasks[cat]=ids.map(id=>todayTasks[cat].find(t=>t.id===id)).filter(Boolean);save('todayTasks',todayTasks);}}
+}
+
+// ═══════════════════════════════
+//  SHARED TASK RENDERING
+// ═══════════════════════════════
+function makeCategoryBlock(cat,tasks,dayKey){
+  const block=document.createElement('div');block.className='category-block';
+  const lbl=document.createElement('div');lbl.className='category-label';lbl.textContent=cat;
+  block.appendChild(lbl);
+  const list=document.createElement('div');list.className='task-list';list.dataset.cat=cat;if(dayKey)list.dataset.daykey=dayKey;
+  tasks.forEach(t=>list.appendChild(makeTaskItem(cat,t,dayKey)));
+  const addRow=document.createElement('div');addRow.className='inline-add';
+  const dot=document.createElement('div');dot.className='inline-add-icon';
+  const inp=document.createElement('input');inp.placeholder='Adicionar tarefa...';
+  inp.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||!inp.value.trim())return;
+    const t={id:uid(),text:inp.value.trim(),done:false};
+    if(dayKey){if(!weekTasks[dayKey])weekTasks[dayKey]={};if(!weekTasks[dayKey][cat])weekTasks[dayKey][cat]=[];weekTasks[dayKey][cat].push(t);save('weekTasks',weekTasks);}
+    else{if(!todayTasks[cat])todayTasks[cat]=[];todayTasks[cat].push(t);save('todayTasks',todayTasks);}
+    inp.value='';list.insertBefore(makeTaskItem(cat,t,dayKey),addRow);
+    if(dayKey)renderWeekCal();
+  });
+  addRow.appendChild(dot);addRow.appendChild(inp);list.appendChild(addRow);block.appendChild(list);
+  return block;
+}
+
+function makeTaskItem(cat,task,dayKey){
+  const row=document.createElement('div');row.className='task-item';row.dataset.tid=task.id;
+  const handle=document.createElement('span');handle.className='drag-handle';handle.textContent='⠿';
+  const chk=document.createElement('div');chk.className='task-check'+(task.done?' done':'');
+  chk.addEventListener('click',()=>{task.done=!task.done;chk.classList.toggle('done');txt.classList.toggle('done-text',task.done);dayKey?save('weekTasks',weekTasks):save('todayTasks',todayTasks);});
+  const txt=document.createElement('div');txt.className='task-text'+(task.done?' done-text':'');txt.contentEditable=true;txt.textContent=task.text;
+  txt.addEventListener('blur',()=>{task.text=txt.textContent.trim()||task.text;dayKey?save('weekTasks',weekTasks):save('todayTasks',todayTasks);});
+  txt.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();txt.blur();}});
+  const del=document.createElement('button');del.className='task-del';del.textContent='×';
+  del.addEventListener('click',()=>{
+    if(dayKey){weekTasks[dayKey][cat]=(weekTasks[dayKey][cat]||[]).filter(t=>t.id!==task.id);save('weekTasks',weekTasks);}
+    else{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);save('todayTasks',todayTasks);}
+    row.remove();
+  });
+  row.appendChild(handle);row.appendChild(chk);row.appendChild(txt);row.appendChild(del);makeDraggable(row);
+  return row;
+}
+
+// ═══════════════════════════════
+//  HOJE
+// ═══════════════════════════════
+function renderHoje(){
+  const c=document.getElementById('hoje-categories');c.innerHTML='';
+  if(!categories.length){c.innerHTML='<p style="font-size:13px;color:var(--hint)">Adicione categorias em Configurações.</p>';return;}
+  categories.forEach(cat=>c.appendChild(makeCategoryBlock(cat,todayTasks[cat]||[],null)));
+}
+
+// ═══════════════════════════════
+//  SEMANA
+// ═══════════════════════════════
+let selectedWeekDay = new Date(now);
+
+function updateWeekRangeLabel(){
+  const wd=getWeekDates(weekOffset);
+  const s=`${wd[0].getDate()} de ${MESES_PT[wd[0].getMonth()].toLowerCase()}`;
+  const e=`${wd[6].getDate()} de ${MESES_PT[wd[6].getMonth()].toLowerCase()} de ${wd[6].getFullYear()}`;
+  document.getElementById('week-range-label').textContent=`${s} – ${e}`;
+  document.getElementById('semana-sub').textContent=`${s} – ${e}`;
+}
+
+function shiftWeek(dir){
+  weekOffset+=dir;
+  // when going back to 0, reset selected to today
+  if(weekOffset===0) selectedWeekDay=new Date(now);
+  else {
+    // select first day of new week
+    selectedWeekDay=getWeekDates(weekOffset)[0];
+  }
+  injectRecurring();
+  renderWeekCal();
+  renderWeekDayTasks();
+  updateWeekRangeLabel();
+}
+
+function goToCurrentWeek(){
+  weekOffset=0;selectedWeekDay=new Date(now);
+  injectRecurring();renderWeekCal();renderWeekDayTasks();updateWeekRangeLabel();
+}
+
+function renderWeekCal(){
+  const cal=document.getElementById('week-cal');cal.innerHTML='';
+  getWeekDates(weekOffset).forEach((date,i)=>{
+    const isToday=date.toDateString()===now.toDateString();
+    const isSel=selectedWeekDay&&date.toDateString()===selectedWeekDay.toDateString();
+    const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
+    const hasTasks=weekTasks[key]&&Object.values(weekTasks[key]).some(a=>a.length>0);
+    const cell=document.createElement('div');
+    cell.className='week-cal-day'+(isToday?' today-cal':'')+(isSel?' selected':'');
+    const name=document.createElement('div');name.className='week-cal-name';name.textContent=WEEK_SHORT[i];
+    const num=document.createElement('div');num.className='week-cal-num';num.textContent=date.getDate();
+    const dot=document.createElement('div');dot.className='week-cal-dot';dot.style.visibility=hasTasks?'visible':'hidden';
+    cell.appendChild(name);cell.appendChild(num);cell.appendChild(dot);
+    cell.addEventListener('click',()=>{selectedWeekDay=date;renderWeekCal();renderWeekDayTasks();});
+    cal.appendChild(cell);
+  });
+  updateWeekRangeLabel();
+}
+
+function renderWeekDayTasks(){
+  const titleEl=document.getElementById('week-sel-title');
+  const subEl=document.getElementById('week-sel-sub');
+  const container=document.getElementById('week-day-cats');container.innerHTML='';
+  if(!selectedWeekDay){subEl.textContent='Selecione um dia acima';return;}
+  const date=selectedWeekDay;
+  const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
+  const isToday=date.toDateString()===now.toDateString();
+  titleEl.textContent=isToday?`Hoje — ${DIAS_PT[date.getDay()]}`:DIAS_PT[date.getDay()];
+  subEl.textContent=`${date.getDate()} de ${MESES_PT[date.getMonth()].toLowerCase()} de ${date.getFullYear()}`;
+  if(!categories.length){container.innerHTML='<p style="font-size:13px;color:var(--hint)">Adicione categorias em Configurações.</p>';return;}
+  categories.forEach(cat=>container.appendChild(makeCategoryBlock(cat,(weekTasks[key]&&weekTasks[key][cat])||[],key)));
+}
+
+// ═══════════════════════════════
+//  HÁBITOS & SONO
+// ═══════════════════════════════
+function renderHabitos(){
+  const days=daysInMonth(currentYear,currentMonth);
+  const thead=document.getElementById('habits-thead');thead.innerHTML='';
+  const tbody=document.getElementById('habits-tbody');tbody.innerHTML='';
+  const trh=document.createElement('tr');
+  const thN=document.createElement('th');thN.textContent='Hábito';thN.style.textAlign='left';thN.style.padding='5px 8px';trh.appendChild(thN);
+  for(let d=1;d<=days;d++){const th=document.createElement('th');th.textContent=d;trh.appendChild(th);}
+  thead.appendChild(trh);
+  habits.forEach(habit=>{
+    const tr=document.createElement('tr');
+    const tdN=document.createElement('td');tdN.className='habit-name';tdN.textContent=habit;tr.appendChild(tdN);
+    for(let d=1;d<=days;d++){
+      const key=`${currentYear}-${currentMonth}-${d}-${habit}`;
+      const td=document.createElement('td');
+      const cell=document.createElement('div');
+      cell.className='habit-cell'+(habitData[key]?' checked':'')+(d===todayDate?' today-col':'');
+      cell.addEventListener('click',()=>{habitData[key]=!habitData[key];save('habitData',habitData);cell.classList.toggle('checked');});
+      td.appendChild(cell);tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  });
+  const trA=document.createElement('tr');trA.className='habit-add-row';
+  const tdA=document.createElement('td');tdA.colSpan=days+1;
+  const inp=document.createElement('input');inp.className='habit-add-input';inp.placeholder='Adicionar hábito...';
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){habits.push(inp.value.trim());save('habits',habits);inp.value='';renderHabitos();renderConfigHabits();}});
+  tdA.appendChild(inp);trA.appendChild(tdA);tbody.appendChild(trA);
+  renderSono();
+}
+
+function calcSonoHours(d,a){
+  if(!d||!a)return null;
+  const[dh,dm]=d.split(':').map(Number);const[ah,am]=a.split(':').map(Number);
+  let diff=(ah*60+am)-(dh*60+dm);if(diff<0)diff+=1440;
+  return parseFloat((diff/60).toFixed(1));
+}
+
+function renderSono(){
+  const grid=document.getElementById('sono-grid');grid.innerHTML='';
+  const days=daysInMonth(currentYear,currentMonth);
+  for(let d=1;d<=days;d++){
+    const key=fmtDate(currentYear,currentMonth,d);
+    const entry=sonoData[key]||{dormir:'',acordar:''};
+    const row=document.createElement('div');row.className='sono-input-row';
+    const dayEl=document.createElement('div');dayEl.className='sono-day';dayEl.textContent=d;
+    const i1=document.createElement('input');i1.className='sono-input';i1.type='time';i1.value=entry.dormir;i1.title='Dormi às';
+    const sep=document.createElement('span');sep.className='sono-sep';sep.textContent='→';
+    const i2=document.createElement('input');i2.className='sono-input';i2.type='time';i2.value=entry.acordar;i2.title='Acordei às';
+    const tot=document.createElement('div');tot.className='sono-total';
+    const hv=calcSonoHours(entry.dormir,entry.acordar);
+    if(hv!==null){tot.textContent=hv+'h';tot.className='sono-total '+(hv>=7?'good':'bad');}
+    const onChange=()=>{
+      if(!sonoData[key])sonoData[key]={dormir:'',acordar:''};
+      sonoData[key].dormir=i1.value;sonoData[key].acordar=i2.value;save('sonoData',sonoData);
+      const h2=calcSonoHours(i1.value,i2.value);
+      if(h2!==null){tot.textContent=h2+'h';tot.className='sono-total '+(h2>=7?'good':'bad');}
+      else{tot.textContent='';tot.className='sono-total';}
+      drawSonoChart();
+    };
+    i1.addEventListener('change',onChange);i2.addEventListener('change',onChange);
+    row.appendChild(dayEl);row.appendChild(i1);row.appendChild(sep);row.appendChild(i2);row.appendChild(tot);
+    grid.appendChild(row);
+  }
+  drawSonoChart();
+}
+
+function drawSonoChart(){
+  const svg=document.getElementById('sono-chart');if(!svg)return;
+  const days=daysInMonth(currentYear,currentMonth);
+  const W=svg.parentElement.clientWidth||680,H=160,pL=32,pR=16,pT=16,pB=28;
+  const cW=W-pL-pR,cH=H-pT-pB,minH=3,maxH=12;
+  const ns='http://www.w3.org/2000/svg';
+  svg.setAttribute('width',W);svg.setAttribute('height',H);svg.innerHTML='';
+  const xs=d=>pL+((d-1)/(days-1))*cW;
+  const ys=h=>pT+cH-((h-minH)/(maxH-minH))*cH;
+  for(let r=0;r<=4;r++){const yy=pT+(r/4)*cH;for(let c=0;c<days;c++){const cc=document.createElementNS(ns,'circle');cc.setAttribute('cx',xs(c+1));cc.setAttribute('cy',yy);cc.setAttribute('r','1');cc.setAttribute('fill','#d8d6ce');svg.appendChild(cc);}}
+  [5,6,7,8,9,10,11].forEach(v=>{
+    if(v<minH||v>maxH)return;
+    const ln=document.createElementNS(ns,'line');ln.setAttribute('x1',pL);ln.setAttribute('y1',ys(v));ln.setAttribute('x2',pL+cW);ln.setAttribute('y2',ys(v));ln.setAttribute('stroke','#e8e6de');ln.setAttribute('stroke-width','0.5');svg.appendChild(ln);
+    const t=document.createElementNS(ns,'text');t.setAttribute('x',pL-6);t.setAttribute('y',ys(v)+4);t.setAttribute('text-anchor','end');t.setAttribute('font-size','9');t.setAttribute('fill','#b8b6ae');t.setAttribute('font-family','DM Sans,sans-serif');t.textContent=v;svg.appendChild(t);
+  });
+  for(let d=1;d<=days;d+=5){const t=document.createElementNS(ns,'text');t.setAttribute('x',xs(d));t.setAttribute('y',H-6);t.setAttribute('text-anchor','middle');t.setAttribute('font-size','9');t.setAttribute('fill','#b8b6ae');t.setAttribute('font-family','DM Sans,sans-serif');t.textContent=d;svg.appendChild(t);}
+  if(currentMonth===now.getMonth()&&currentYear===now.getFullYear()){const tl=document.createElementNS(ns,'line');tl.setAttribute('x1',xs(todayDate));tl.setAttribute('x2',xs(todayDate));tl.setAttribute('y1',pT);tl.setAttribute('y2',pT+cH);tl.setAttribute('stroke','#c8c6be');tl.setAttribute('stroke-width','0.5');tl.setAttribute('stroke-dasharray','3,3');svg.appendChild(tl);}
+  const pts=[];for(let d=1;d<=days;d++){const entry=sonoData[fmtDate(currentYear,currentMonth,d)]||{};pts.push({d,h:calcSonoHours(entry.dormir,entry.acordar)});}
+  const valid=pts.filter(p=>p.h!==null);if(valid.length<2)return;
+  const poly=document.createElementNS(ns,'polyline');poly.setAttribute('points',valid.map(p=>`${xs(p.d)},${ys(p.h)}`).join(' '));poly.setAttribute('fill','none');poly.setAttribute('stroke','#1a1a18');poly.setAttribute('stroke-width','1.2');poly.setAttribute('stroke-linejoin','round');poly.setAttribute('stroke-linecap','round');svg.appendChild(poly);
+  valid.forEach(p=>{const c=document.createElementNS(ns,'circle');c.setAttribute('cx',xs(p.d));c.setAttribute('cy',ys(p.h));c.setAttribute('r','2.5');c.setAttribute('fill','#1a1a18');svg.appendChild(c);});
+}
+
+// ═══════════════════════════════
+//  GRATIDÃO
+// ═══════════════════════════════
+function renderGratidao(){
+  const list=document.getElementById('gratitude-list');list.innerHTML='';
+  const days=daysInMonth(currentYear,currentMonth);
+  for(let d=1;d<=days;d++){
+    const key=fmtDate(currentYear,currentMonth,d);const val=gratData[key]||'';
+    const row=document.createElement('div');row.className='gratitude-row';
+    const de=document.createElement('div');de.className='gratitude-day';de.textContent=d;
+    const ta=document.createElement('textarea');ta.className='gratitude-input';ta.rows=1;
+    ta.placeholder=d===todayDate?'O que você agradece hoje?':'';ta.value=val;
+    ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';gratData[key]=ta.value;save('gratData',gratData);});
+    if(val)setTimeout(()=>{ta.style.height=ta.scrollHeight+'px';},0);
+    row.appendChild(de);row.appendChild(ta);list.appendChild(row);
+  }
+}
+
+// ═══════════════════════════════
+//  DIÁRIO
+// ═══════════════════════════════
+let diaryDate = new Date(now);
+let miniCalDate = new Date(now.getFullYear(), now.getMonth(), 1);
+
+function diaryKey(date){return fmtDate(date.getFullYear(),date.getMonth(),date.getDate());}
+
+function diaryShift(dir){
+  diaryDate.setDate(diaryDate.getDate()+dir);
+  renderDiaryEntry();
+}
+function diaryGoToday(){diaryDate=new Date(now);renderDiaryEntry();}
+
+function toggleDiaryCal(){
+  const cal=document.getElementById('diary-mini-cal');
+  cal.classList.toggle('hidden');
+  if(!cal.classList.contains('hidden')) renderMiniCal();
+  // close on outside click
+  setTimeout(()=>{ document.addEventListener('click',closeMiniCalOutside,{once:true}); },0);
+}
+function closeMiniCalOutside(e){
+  const cal=document.getElementById('diary-mini-cal');
+  if(cal&&!cal.contains(e.target)&&!e.target.classList.contains('diary-cal-btn'))
+    cal.classList.add('hidden');
+}
+
+function renderMiniCal(){
+  const cal=document.getElementById('diary-mini-cal');cal.innerHTML='';
+  const y=miniCalDate.getFullYear(),m=miniCalDate.getMonth();
+  const days=daysInMonth(y,m);
+  const firstDow=new Date(y,m,1).getDay(); // 0=Sun
+  // header
+  const header=document.createElement('div');header.className='mini-cal-header';
+  const prev=document.createElement('button');prev.className='mini-cal-nav';prev.textContent='←';
+  prev.onclick=e=>{e.stopPropagation();miniCalDate=new Date(y,m-1,1);renderMiniCal();};
+  const title=document.createElement('span');title.className='mini-cal-title';title.textContent=`${MESES_PT[m]} ${y}`;
+  const next=document.createElement('button');next.className='mini-cal-nav';next.textContent='→';
+  next.onclick=e=>{e.stopPropagation();miniCalDate=new Date(y,m+1,1);renderMiniCal();};
+  header.appendChild(prev);header.appendChild(title);header.appendChild(next);cal.appendChild(header);
+  // grid
+  const grid=document.createElement('div');grid.className='mini-cal-grid';
+  ['D','S','T','Q','Q','S','S'].forEach(d=>{const el=document.createElement('div');el.className='mini-cal-dow';el.textContent=d;grid.appendChild(el);});
+  // empty cells before first
+  const startOffset=(firstDow===0?6:firstDow-1); // Mon-based
+  // actually use Sun-based for simplicity
+  for(let i=0;i<firstDow;i++){const el=document.createElement('div');el.className='mini-cal-cell empty';grid.appendChild(el);}
+  for(let d=1;d<=days;d++){
+    const key=fmtDate(y,m,d);
+    const hasEntry=diaryData[key]&&Object.values(diaryData[key]).some(v=>v&&v!==0);
+    const isSelected=diaryDate.getFullYear()===y&&diaryDate.getMonth()===m&&diaryDate.getDate()===d;
+    const el=document.createElement('div');
+    el.className='mini-cal-cell'+(hasEntry?' has-entry':'')+(isSelected?' selected-day':'');
+    el.textContent=d;
+    el.onclick=e=>{e.stopPropagation();diaryDate=new Date(y,m,d);document.getElementById('diary-mini-cal').classList.add('hidden');renderDiaryEntry();};
+    grid.appendChild(el);
+  }
+  cal.appendChild(grid);
+}
+
+const DIARY_FIELDS = [
+  { section:'O que aconteceu', fields:[{key:'aconteceu',label:'Fatos objetivos, sem interpretação',ph:'O que aconteceu hoje?'}] },
+  { section:'O que foi relevante', fields:[{key:'relevante',label:'O que realmente impactou seu dia',ph:'O que mais importou?'}] },
+  { section:'Aprendizado', fields:[
+    {key:'aprendizado',label:'O que isso me ensinou?',ph:'Qual foi o aprendizado?'},
+    {key:'padrao',label:'Existe um padrão aqui?',ph:'Algum padrão recorrente?'}
+  ]},
+  { section:'Ação', fields:[
+    {key:'acao',label:'O que vou fazer diferente amanhã?',ph:'O que vou mudar?'},
+    {key:'proximaAcao',label:'Próxima ação clara',ph:'Uma ação concreta e específica'}
+  ]},
+  { section:'Ideias', fields:[
+    {key:'ideiasConteudo',label:'Conteúdo',ph:'Ideias de conteúdo...'},
+    {key:'ideiasNegocio',label:'Negócio',ph:'Ideias de negócio...'},
+    {key:'ideiasMP',label:'Melhoria pessoal',ph:'Ideias de melhoria pessoal...'}
+  ]}
+];
+
+function renderDiaryEntry(){
+  // update date label
+  const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  document.getElementById('diary-date-label').textContent=
+    `${DIAS_PT[diaryDate.getDay()]}, ${diaryDate.getDate()} de ${meses[diaryDate.getMonth()]} de ${diaryDate.getFullYear()}`;
+
+  const key=diaryKey(diaryDate);
+  if(!diaryData[key]) diaryData[key]={energia:0,humor:0,aconteceu:'',relevante:'',aprendizado:'',padrao:'',acao:'',proximaAcao:'',ideiasConteudo:'',ideiasNegocio:'',ideiasMP:''};
+  const entry=diaryData[key];
+
+  const wrap=document.getElementById('diary-entry-wrap');wrap.innerHTML='';
+
+  // Scales
+  const scalesDiv=document.createElement('div');scalesDiv.style.marginBottom='1.5rem';
+
+  ['energia','humor'].forEach(field=>{
+    const row=document.createElement('div');row.className='scale-row';
+    const lbl=document.createElement('div');lbl.className='scale-label';
+    lbl.textContent=field==='energia'?'Energia':'Humor';
+    const btns=document.createElement('div');btns.className='scale-btns';
+    for(let i=1;i<=5;i++){
+      const btn=document.createElement('button');btn.className='scale-btn'+(entry[field]===i?' on':'');
+      btn.textContent=i;btn.type='button';
+      btn.addEventListener('click',()=>{
+        entry[field]=entry[field]===i?0:i;
+        save('diaryData',diaryData);
+        btns.querySelectorAll('.scale-btn').forEach((b,idx)=>b.classList.toggle('on',(idx+1)===entry[field]));
+      });
+      btns.appendChild(btn);
+    }
+    row.appendChild(lbl);row.appendChild(btns);scalesDiv.appendChild(row);
+  });
+  wrap.appendChild(scalesDiv);
+
+  // Sections
+  DIARY_FIELDS.forEach(sec=>{
+    const secDiv=document.createElement('div');secDiv.className='diary-section';
+    const title=document.createElement('div');title.className='diary-section-title';title.textContent=sec.section;
+    secDiv.appendChild(title);
+    sec.fields.forEach(f=>{
+      const fieldDiv=document.createElement('div');fieldDiv.className='diary-field';
+      if(sec.fields.length>1){
+        const fl=document.createElement('div');fl.className='diary-field-label';fl.textContent=f.label;fieldDiv.appendChild(fl);
+      }
+      const ta=document.createElement('textarea');ta.className='diary-textarea';ta.placeholder=f.ph;ta.value=entry[f.key]||'';ta.rows=2;
+      ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';entry[f.key]=ta.value;save('diaryData',diaryData);});
+      setTimeout(()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';},0);
+      fieldDiv.appendChild(ta);secDiv.appendChild(fieldDiv);
+    });
+    wrap.appendChild(secDiv);
+  });
+}
+
+// ═══════════════════════════════
+//  RELATÓRIO
+// ═══════════════════════════════
+function initReportSelect(){
+  const sel=document.getElementById('report-month-sel');
+  for(let m=0;m<12;m++){const opt=document.createElement('option');opt.value=m;opt.textContent=`${MESES_PT[m]} ${currentYear}`;if(m===currentMonth)opt.selected=true;sel.appendChild(opt);}
+  sel.addEventListener('change',renderReport);
+}
+function renderReport(){
+  const m=parseInt(document.getElementById('report-month-sel').value),y=currentYear,days=daysInMonth(y,m);
+  const hDiv=document.getElementById('report-habits');hDiv.innerHTML='';
+  if(!habits.length){hDiv.innerHTML='<p style="font-size:13px;color:var(--hint)">Nenhum hábito registrado.</p>';}
+  else habits.forEach(h=>{
+    let c=0;for(let d=1;d<=days;d++)if(habitData[`${y}-${m}-${d}-${h}`])c++;
+    const pct=Math.round(c/days*100);
+    const row=document.createElement('div');row.className='report-habit-row';
+    const nm=document.createElement('span');nm.textContent=h;nm.style.cssText='min-width:100px;font-size:13px';
+    const bw=document.createElement('div');bw.className='report-bar-wrap';
+    const bar=document.createElement('div');bar.className='report-bar';bar.style.width=pct+'%';bw.appendChild(bar);
+    const pe=document.createElement('div');pe.className='report-pct';pe.textContent=pct+'%';
+    row.appendChild(nm);row.appendChild(bw);row.appendChild(pe);hDiv.appendChild(row);
+  });
+  const sDiv=document.getElementById('report-sleep');sDiv.innerHTML='';
+  let totalH=0,cntS=0;
+  for(let d=1;d<=days;d++){const e=sonoData[fmtDate(y,m,d)]||{};const h=calcSonoHours(e.dormir,e.acordar);if(h!==null){totalH+=h;cntS++;}}
+  const avg=cntS>0?(totalH/cntS).toFixed(1):'—';
+  sDiv.innerHTML=`<div class="report-stat"><div class="report-stat-num">${avg}h</div><div class="report-stat-label">Média de sono</div></div><div class="report-stat"><div class="report-stat-num">${cntS}</div><div class="report-stat-label">Dias registrados</div></div><div class="report-stat"><div class="report-stat-num">${cntS>0?totalH.toFixed(0):'—'}h</div><div class="report-stat-label">Total no mês</div></div>`;
+  const gDiv=document.getElementById('report-gratitude');gDiv.innerHTML='';
+  for(let d=1;d<=days;d++){const val=gratData[fmtDate(y,m,d)];if(!val)continue;const en=document.createElement('div');en.className='report-gratitude-entry';const de=document.createElement('div');de.className='report-g-day';de.textContent=d;const te=document.createElement('div');te.textContent=val;en.appendChild(de);en.appendChild(te);gDiv.appendChild(en);}
+  if(!gDiv.children.length)gDiv.innerHTML='<p style="font-size:13px;color:var(--hint)">Nenhum registro este mês.</p>';
+}
+
+// ═══════════════════════════════
+//  CONFIG
+// ═══════════════════════════════
+function renderConfigCats(){
+  const list=document.getElementById('cat-list');list.innerHTML='';
+  categories.forEach((cat,i)=>{
+    const tag=document.createElement('div');tag.className='config-tag';tag.textContent=cat;
+    const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';
+    del.addEventListener('click',()=>{categories.splice(i,1);save('categories',categories);renderConfigCats();renderHoje();refreshRecurCatSel();});
+    tag.appendChild(del);list.appendChild(tag);
+  });
+}
+function addCategory(){
+  const inp=document.getElementById('cat-input');const val=inp.value.trim();
+  if(!val||categories.includes(val)){inp.value='';return;}
+  categories.push(val);save('categories',categories);inp.value='';renderConfigCats();renderHoje();refreshRecurCatSel();
+}
+document.getElementById('cat-input').addEventListener('keydown',e=>{if(e.key==='Enter')addCategory();});
+
+function renderConfigHabits(){
+  const list=document.getElementById('habit-list-config');list.innerHTML='';
+  habits.forEach((h,i)=>{
+    const item=document.createElement('div');item.className='config-habit-item';
+    const nm=document.createElement('span');nm.textContent=h;
+    const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';del.style.fontSize='16px';
+    del.addEventListener('click',()=>{habits.splice(i,1);save('habits',habits);renderConfigHabits();renderHabitos();});
+    item.appendChild(nm);item.appendChild(del);list.appendChild(item);
+  });
+}
+function addHabit(){
+  const inp=document.getElementById('habit-input');const val=inp.value.trim();
+  if(!val||habits.includes(val)){inp.value='';return;}
+  habits.push(val);save('habits',habits);inp.value='';renderConfigHabits();renderHabitos();
+}
+document.getElementById('habit-input').addEventListener('keydown',e=>{if(e.key==='Enter')addHabit();});
+
+// RECORRENTES
+let recurDaysSel=[];
+function initRecurPicker(){
+  const picker=document.getElementById('recur-picker');picker.innerHTML='';
+  DOW_SHORT.forEach((lbl,i)=>{
+    const btn=document.createElement('button');btn.className='dow-btn'+(recurDaysSel.includes(i)?' on':'');btn.textContent=lbl;btn.type='button';
+    btn.addEventListener('click',()=>{const idx=recurDaysSel.indexOf(i);if(idx===-1)recurDaysSel.push(i);else recurDaysSel.splice(idx,1);btn.classList.toggle('on');});
+    picker.appendChild(btn);
+  });
+}
+function refreshRecurCatSel(){
+  const sel=document.getElementById('recur-cat');sel.innerHTML='';
+  categories.forEach(cat=>{const opt=document.createElement('option');opt.value=cat;opt.textContent=cat;sel.appendChild(opt);});
+}
+function renderRecurList(){
+  const list=document.getElementById('recur-list');list.innerHTML='';
+  if(!recurring.length){list.innerHTML='<p style="font-size:12px;color:var(--hint);padding:6px 0">Nenhuma tarefa recorrente ainda.</p>';return;}
+  recurring.forEach((r,i)=>{
+    const item=document.createElement('div');item.className='recur-item';
+    const left=document.createElement('div');
+    const nm=document.createElement('div');nm.className='recur-item-name';nm.textContent=r.text;
+    const ct=document.createElement('div');ct.className='recur-item-cat';ct.textContent=r.category;
+    const dl=document.createElement('div');dl.className='recur-item-days';dl.textContent=r.days.length===7?'Todos os dias':r.days.map(d=>DOW_SHORT[d]).join(', ');
+    left.appendChild(nm);left.appendChild(ct);left.appendChild(dl);
+    const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';del.style.fontSize='18px';
+    del.addEventListener('click',()=>{recurring.splice(i,1);save('recurring',recurring);renderRecurList();});
+    item.appendChild(left);item.appendChild(del);list.appendChild(item);
+  });
+}
+function addRecurring(){
+  const nameVal=document.getElementById('recur-name').value.trim();
+  const catVal=document.getElementById('recur-cat').value;
+  if(!nameVal){document.getElementById('recur-name').focus();return;}
+  if(!recurDaysSel.length){alert('Selecione ao menos um dia.');return;}
+  const r={id:uid(),text:nameVal,category:catVal,days:[...recurDaysSel].sort()};
+  recurring.push(r);save('recurring',recurring);
+  document.getElementById('recur-name').value='';
+  recurDaysSel=[];initRecurPicker();renderRecurList();injectRecurring();renderHoje();
+  if(selectedWeekDay)renderWeekDayTasks();
+}
+
+// ═══════════════════════════════
+//  EXPORT MONTH PICKERS
+// ═══════════════════════════════
+function initExportSelects(){
+  ['diary','report'].forEach(type=>{
+    const wrap=document.getElementById(`${type}-month-checks`);
+    wrap.innerHTML='';
+    for(let m=0;m<12;m++){
+      const btn=document.createElement('button');
+      btn.className='month-check-btn'+(m===currentMonth?' on':'');
+      btn.textContent=MESES_PT[m].slice(0,3);
+      btn.dataset.month=m;
+      btn.addEventListener('click',()=>btn.classList.toggle('on'));
+      wrap.appendChild(btn);
+    }
+  });
+}
+
+function getSelectedMonths(type){
+  return [...document.querySelectorAll(`#${type}-month-checks .month-check-btn.on`)]
+    .map(b=>parseInt(b.dataset.month))
+    .sort((a,b)=>a-b);
+}
+
+// ═══════════════════════════════
+//  PDF EXPORT
+// ═══════════════════════════════
+const mesesMin=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+function exportDiaryPDF(mode){
+  const y=currentYear;
+  const months=mode==='all'?[0,1,2,3,4,5,6,7,8,9,10,11]:getSelectedMonths('diary');
+  if(!months.length){alert('Selecione ao menos um mês.');return;}
+
+  let html=`<html><head><meta charset="UTF-8"><style>
+    body{font-family:'Georgia',serif;color:#1a1a18;padding:40px;max-width:700px;margin:0 auto;line-height:1.6}
+    h1{font-size:24px;font-weight:400;margin-bottom:4px}
+    .period{font-size:13px;color:#8a8880;margin-bottom:32px}
+    .month-title{font-size:18px;font-weight:400;font-family:'Georgia',serif;margin:36px 0 20px;padding-bottom:8px;border-bottom:2px solid #1a1a18}
+    .entry{margin-bottom:36px;page-break-inside:avoid}
+    .entry-date{font-size:14px;font-weight:500;border-bottom:1px solid #e4e2da;padding-bottom:6px;margin-bottom:12px}
+    .scales{display:flex;gap:24px;margin-bottom:12px}
+    .scale-item{font-size:12px;color:#8a8880}
+    .scale-val{font-weight:500;color:#1a1a18}
+    .section{margin-bottom:12px}
+    .section-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#8a8880;font-weight:500;margin-bottom:3px;font-family:'DM Sans',sans-serif}
+    .field-label{font-size:9px;color:#b8b6ae;text-transform:uppercase;letter-spacing:.08em;font-family:'DM Sans',sans-serif;margin-bottom:2px}
+    .field-val{font-size:13px;white-space:pre-wrap}
+    @media print{body{padding:20px}.month-title{page-break-before:always}}
+  </style></head><body>`;
+  html+=`<h1>Diário</h1><div class="period">${y}</div>`;
+
+  let totalCount=0;
+  months.forEach(m=>{
+    const days=daysInMonth(y,m);
+    let monthCount=0;
+    let monthHtml='';
+    for(let d=1;d<=days;d++){
+      const key=fmtDate(y,m,d);
+      const entry=diaryData[key];
+      if(!entry) continue;
+      const hasContent=Object.entries(entry).some(([k,v])=>k!=='energia'&&k!=='humor'&&v);
+      const hasScale=entry.energia>0||entry.humor>0;
+      if(!hasContent&&!hasScale) continue;
+      monthCount++;totalCount++;
+      const dateObj=new Date(y,m,d);
+      monthHtml+=`<div class="entry"><div class="entry-date">${DIAS_PT[dateObj.getDay()]}, ${d} de ${mesesMin[m]} de ${y}</div>`;
+      if(hasScale){
+        monthHtml+=`<div class="scales">`;
+        if(entry.energia>0) monthHtml+=`<div class="scale-item">Energia: <span class="scale-val">${entry.energia}/5</span></div>`;
+        if(entry.humor>0)   monthHtml+=`<div class="scale-item">Humor: <span class="scale-val">${entry.humor}/5</span></div>`;
+        monthHtml+=`</div>`;
+      }
+      DIARY_FIELDS.forEach(sec=>{
+        const anyVal=sec.fields.some(f=>entry[f.key]);
+        if(!anyVal) return;
+        monthHtml+=`<div class="section"><div class="section-title">${sec.section}</div>`;
+        sec.fields.forEach(f=>{
+          if(!entry[f.key]) return;
+          if(sec.fields.length>1) monthHtml+=`<div class="field-label">${f.label}</div>`;
+          monthHtml+=`<div class="field-val">${entry[f.key].replace(/</g,'&lt;')}</div>`;
+        });
+        monthHtml+=`</div>`;
+      });
+      monthHtml+=`</div>`;
+    }
+    if(monthCount>0){
+      html+=`<div class="month-title">${MESES_PT[m]}</div>${monthHtml}`;
+    }
+  });
+
+  if(totalCount===0) html+=`<p style="color:#8a8880;font-size:13px">Nenhuma entrada encontrada nos meses selecionados.</p>`;
+  html+=`</body></html>`;
+  const win=window.open('','_blank');
+  win.document.write(html);win.document.close();
+  win.onload=()=>{win.focus();win.print();};
+}
+
+function exportReportPDF(mode){
+  const y=currentYear;
+  const months=mode==='all'?[0,1,2,3,4,5,6,7,8,9,10,11]:getSelectedMonths('report');
+  if(!months.length){alert('Selecione ao menos um mês.');return;}
+
+  let html=`<html><head><meta charset="UTF-8"><style>
+    body{font-family:'Georgia',serif;color:#1a1a18;padding:40px;max-width:700px;margin:0 auto;line-height:1.6}
+    h1{font-size:24px;font-weight:400;margin-bottom:4px}
+    .period{font-size:13px;color:#8a8880;margin-bottom:32px}
+    .month-title{font-size:18px;font-weight:400;font-family:'Georgia',serif;margin:36px 0 16px;padding-bottom:8px;border-bottom:2px solid #1a1a18}
+    h2{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:#8a8880;border-bottom:1px solid #e4e2da;padding-bottom:5px;margin:20px 0 10px;font-family:'DM Sans',sans-serif}
+    .habit-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #f0efe9;font-size:12px;gap:12px}
+    .habit-name{min-width:120px}
+    .bar-wrap{flex:1;height:3px;background:#e4e2da;border-radius:2px}
+    .bar-fill{height:3px;background:#1a1a18;border-radius:2px}
+    .pct{font-size:10px;color:#8a8880;width:28px;text-align:right}
+    .stats{display:flex;gap:28px;margin-bottom:12px}
+    .stat-num{font-size:24px;font-family:'Georgia',serif}
+    .stat-lbl{font-size:10px;color:#8a8880}
+    .grat-row{display:grid;grid-template-columns:28px 1fr;gap:8px;padding:4px 0;border-bottom:1px solid #f0efe9;font-size:12px}
+    .grat-day{color:#8a8880;font-size:10px}
+    @media print{body{padding:20px}.month-title{page-break-before:always}}
+  </style></head><body>`;
+  html+=`<h1>Relatório</h1><div class="period">${y}</div>`;
+
+  months.forEach(m=>{
+    const days=daysInMonth(y,m);
+    html+=`<div class="month-title">${MESES_PT[m]}</div>`;
+
+    // Habits
+    html+=`<h2>Hábitos</h2>`;
+    if(!habits.length){ html+=`<p style="font-size:12px;color:#8a8880">Nenhum hábito registrado.</p>`; }
+    else habits.forEach(h=>{
+      let c=0;for(let d=1;d<=days;d++)if(habitData[`${y}-${m}-${d}-${h}`])c++;
+      const pct=Math.round(c/days*100);
+      html+=`<div class="habit-row"><div class="habit-name">${h}</div><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div><div class="pct">${pct}%</div></div>`;
+    });
+
+    // Sleep
+    let totalH=0,cntS=0;
+    for(let d=1;d<=days;d++){const e=sonoData[fmtDate(y,m,d)]||{};const h=calcSonoHours(e.dormir,e.acordar);if(h!==null){totalH+=h;cntS++;}}
+    const avg=cntS>0?(totalH/cntS).toFixed(1):'—';
+    html+=`<h2>Sono</h2><div class="stats">`;
+    html+=`<div><div class="stat-num">${avg}h</div><div class="stat-lbl">Média de sono</div></div>`;
+    html+=`<div><div class="stat-num">${cntS}</div><div class="stat-lbl">Dias registrados</div></div>`;
+    html+=`<div><div class="stat-num">${cntS>0?totalH.toFixed(0):'—'}h</div><div class="stat-lbl">Total no mês</div></div>`;
+    html+=`</div>`;
+
+    // Gratitude
+    html+=`<h2>Gratidão</h2>`;
+    let gCount=0;
+    for(let d=1;d<=days;d++){const val=gratData[fmtDate(y,m,d)];if(!val)continue;gCount++;html+=`<div class="grat-row"><div class="grat-day">${d}</div><div>${val.replace(/</g,'&lt;')}</div></div>`;}
+    if(!gCount) html+=`<p style="font-size:12px;color:#8a8880">Nenhum registro este mês.</p>`;
+  });
+
+  html+=`</body></html>`;
+  const win=window.open('','_blank');
+  win.document.write(html);win.document.close();
+  win.onload=()=>{win.focus();win.print();};
+}
+
+// ═══════════════════════════════
+//  INIT
+// ═══════════════════════════════
+function init(){
+  initDates();
+  injectRecurring();
+  renderHoje();
+  updateWeekRangeLabel();
+  renderWeekCal();
+  renderWeekDayTasks();
+  renderHabitos();
+  renderGratidao();
+  renderDiaryEntry();
+  initReportSelect();
+  renderConfigCats();
+  renderConfigHabits();
+  refreshRecurCatSel();
+  initRecurPicker();
+  renderRecurList();
+  initExportSelects();
+}
+init();
+</script>
+</body>
+</html>
