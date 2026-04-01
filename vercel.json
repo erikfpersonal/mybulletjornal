@@ -1,0 +1,15 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/login.html" }
+  ]
+}
+```
+
+Isso faz com que quem acessar o domínio raiz (`seusite.com`) caia direto no login.
+
+**2. Estrutura de arquivos no projeto:**
+```
+/
+├── login.html
+├── index.html
+└── vercel.json
