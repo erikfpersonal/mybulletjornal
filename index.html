@@ -641,7 +641,10 @@ const WEEK_SHORT = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
 // ═══════════════════════════════
 function load(k,d){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):d;}catch(e){return d;}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-function uid(){return Math.random().toString(36).slice(2,9);}
+function uid(){
+  return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>
+    (c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+}
 
 let categories = ['Profissional','Saúde','Pessoal'];
 let habits     = ['Exercício','Meditação','Leitura'];
@@ -1530,9 +1533,11 @@ async function loadAllData(){
   if(recT) recurring = recT.map(r => ({ id: r.id, text: r.text, category: r.category, days: r.days }));
 
   // Habit logs do mês
+  const monthStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  const monthEnd   = `${y}-${String(m+1).padStart(2,'0')}-${String(daysInMonth(y,m)).padStart(2,'0')}`;
+
   const { data: hlogs } = await sb.from('habit_logs').select('*').eq('user_id', uid)
-    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
-    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+    .gte('log_date', monthStart).lte('log_date', monthEnd);
   if(hlogs){
     habitData = {};
     hlogs.forEach(l => {
@@ -1543,8 +1548,7 @@ async function loadAllData(){
 
   // Sono do mês
   const { data: slogs } = await sb.from('sleep_logs').select('*').eq('user_id', uid)
-    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
-    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+    .gte('log_date', monthStart).lte('log_date', monthEnd);
   if(slogs){
     sonoData = {};
     slogs.forEach(l => {
@@ -1558,8 +1562,7 @@ async function loadAllData(){
 
   // Gratidão do mês
   const { data: grats } = await sb.from('gratitude').select('*').eq('user_id', uid)
-    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
-    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+    .gte('log_date', monthStart).lte('log_date', monthEnd);
   if(grats){
     gratData = {};
     grats.forEach(g => {
@@ -1570,8 +1573,7 @@ async function loadAllData(){
 
   // Diário do mês
   const { data: diary } = await sb.from('diary').select('*').eq('user_id', uid)
-    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
-    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+    .gte('log_date', monthStart).lte('log_date', monthEnd);
   if(diary){
     diaryData = {};
     diary.forEach(e => {
@@ -1617,18 +1619,27 @@ async function saveHabits(){
   }
 }
 
-// Tarefa individual (upsert)
+// Tarefa individual — insert ou update
 async function saveTask(task, category, dateStr){
-  const { error } = await sb.from('tasks').upsert({
-    id: task.id,
-    user_id: currentUser.id,
-    category,
-    text: task.text,
-    done: task.done,
-    task_date: dateStr,
-    recur_id: task.recurId || null
-  });
-  if(error) console.error('saveTask error:', error.message);
+  // Tenta atualizar primeiro; se não existir, insere
+  const { data: existing } = await sb.from('tasks').select('id').eq('id', task.id).single();
+  if(existing){
+    const { error } = await sb.from('tasks').update({
+      text: task.text, done: task.done, category, task_date: dateStr
+    }).eq('id', task.id).eq('user_id', currentUser.id);
+    if(error) console.error('saveTask update error:', error.message);
+  } else {
+    const { error } = await sb.from('tasks').insert({
+      id: task.id,
+      user_id: currentUser.id,
+      category,
+      text: task.text,
+      done: task.done,
+      task_date: dateStr,
+      recur_id: task.recurId || null
+    });
+    if(error) console.error('saveTask insert error:', error.message);
+  }
 }
 
 // Deletar tarefa
@@ -1700,13 +1711,20 @@ async function saveDiaryEntry(dateISO, entry){
 
 // Recorrentes
 async function saveRecurring(){
-  const uid = currentUser.id;
-  await sb.from('recurring_tasks').delete().eq('user_id', uid);
+  const uid2 = currentUser.id;
+  await sb.from('recurring_tasks').delete().eq('user_id', uid2);
   if(recurring.length){
-    const { error } = await sb.from('recurring_tasks').insert(
-      recurring.map(r => ({ id: r.id, user_id: uid, text: r.text, category: r.category, days: r.days }))
-    );
+    const rows = recurring.map(r => ({
+      user_id: uid2,
+      text: r.text,
+      category: r.category,
+      days: r.days
+    }));
+    const { error } = await sb.from('recurring_tasks').insert(rows);
     if(error) console.error('saveRecurring error:', error.message);
+    // Update local IDs with what Supabase assigned
+    const { data: fresh } = await sb.from('recurring_tasks').select('*').eq('user_id', uid2);
+    if(fresh) recurring = fresh.map(r => ({ id: r.id, text: r.text, category: r.category, days: r.days }));
   }
 }
 
