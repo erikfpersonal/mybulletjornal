@@ -496,13 +496,28 @@ table.habits-table{width:100%;border-collapse:collapse;font-size:12px}
   <div class="page" id="page-relatorio">
     <div class="page-header">
       <h2>Relatório</h2>
-      <p>Resumo mensal de hábitos, sono e gratidão</p>
+      <p>Histórico mensal de hábitos, sono e gratidão</p>
     </div>
     <div class="divider"></div>
-    <div class="report-month-select"><select id="report-month-sel"></select></div>
-    <div class="report-section"><div class="report-section-title">Hábitos</div><div id="report-habits"></div></div>
-    <div class="report-section"><div class="report-section-title">Sono</div><div class="report-sleep-avg" id="report-sleep"></div></div>
-    <div class="report-section"><div class="report-section-title">Gratidão</div><div class="report-gratitude-list" id="report-gratitude"></div></div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:2rem">
+      <select id="report-month-sel" style="border:1px solid var(--border);background:var(--surface);font-family:var(--sans);font-size:13px;color:var(--text);padding:6px 10px;border-radius:6px;outline:none;cursor:pointer"></select>
+    </div>
+
+    <!-- Hábitos — mesmo grid do hábitos/sono -->
+    <div class="sono-label">Hábitos</div>
+    <div class="habits-table-wrap" style="margin-bottom:2.5rem">
+      <table class="habits-table"><thead id="rep-habits-thead"></thead><tbody id="rep-habits-tbody"></tbody></table>
+    </div>
+
+    <!-- Sono — mesmo gráfico + stats -->
+    <div class="sono-label">Sono</div>
+    <div class="sono-chart-wrap"><svg id="rep-sono-chart" height="160"></svg></div>
+    <div style="display:flex;gap:2rem;margin-bottom:2.5rem;margin-top:.5rem" id="rep-sleep-stats"></div>
+
+    <!-- Gratidão — lista igual à página de gratidão -->
+    <div class="sono-label">Gratidão</div>
+    <div class="gratitude-list" id="rep-gratitude-list"></div>
   </div>
 
   <!-- CONFIGURAÇÕES -->
@@ -809,9 +824,23 @@ function makeCategoryBlock(cat,tasks,dayKey){
   inp.addEventListener('keydown',e=>{
     if(e.key!=='Enter'||!inp.value.trim())return;
     const t={id:uid(),text:inp.value.trim(),done:false};
-    const dateStr=dayKey||toDateStr(now);
-    if(dayKey){if(!weekTasks[dayKey])weekTasks[dayKey]={};if(!weekTasks[dayKey][cat])weekTasks[dayKey][cat]=[];weekTasks[dayKey][cat].push(t);}
-    else{if(!todayTasks[cat])todayTasks[cat]=[];todayTasks[cat].push(t);}
+    const todayKey=toDateStr(now);
+    const dateStr=dayKey||todayKey;
+    const isToday=dateStr===todayKey;
+    if(dayKey){
+      if(!weekTasks[dayKey])weekTasks[dayKey]={};
+      if(!weekTasks[dayKey][cat])weekTasks[dayKey][cat]=[];
+      weekTasks[dayKey][cat].push(t);
+      // Se é hoje, sincroniza todayTasks
+      if(isToday){if(!todayTasks[cat])todayTasks[cat]=[];todayTasks[cat].push(t);}
+    } else {
+      if(!todayTasks[cat])todayTasks[cat]=[];
+      todayTasks[cat].push(t);
+      // Sincroniza weekTasks[hoje]
+      if(!weekTasks[todayKey])weekTasks[todayKey]={};
+      if(!weekTasks[todayKey][cat])weekTasks[todayKey][cat]=[];
+      weekTasks[todayKey][cat].push(t);
+    }
     saveTask(t,cat,dateStr);
     inp.value='';list.insertBefore(makeTaskItem(cat,t,dayKey),addRow);
     if(dayKey)renderWeekCal();
@@ -837,8 +866,19 @@ function makeTaskItem(cat,task,dayKey){
   const del=document.createElement('button');del.className='task-del';del.textContent='×';
   del.addEventListener('click',()=>{
     deleteTask(task.id);
-    if(dayKey){weekTasks[dayKey][cat]=(weekTasks[dayKey][cat]||[]).filter(t=>t.id!==task.id);}
-    else{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);}
+    const todayKey=toDateStr(now);
+    if(dayKey){
+      if(weekTasks[dayKey]&&weekTasks[dayKey][cat])
+        weekTasks[dayKey][cat]=(weekTasks[dayKey][cat]||[]).filter(t=>t.id!==task.id);
+      // Se é hoje, sincroniza todayTasks também
+      if(dayKey===todayKey)
+        todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);
+    } else {
+      todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);
+      // Sincroniza weekTasks[hoje] também
+      if(weekTasks[todayKey]&&weekTasks[todayKey][cat])
+        weekTasks[todayKey][cat]=(weekTasks[todayKey][cat]||[]).filter(t=>t.id!==task.id);
+    }
     row.remove();
   });
   row.appendChild(handle);row.appendChild(chk);row.appendChild(txt);row.appendChild(del);makeDraggable(row);
@@ -891,13 +931,16 @@ function renderWeekCal(){
   getWeekDates(weekOffset).forEach((date,i)=>{
     const isToday=date.toDateString()===now.toDateString();
     const isSel=selectedWeekDay&&date.toDateString()===selectedWeekDay.toDateString();
-    const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
-    const hasTasks=weekTasks[key]&&Object.values(weekTasks[key]).some(a=>a.length>0);
+    // Usa ISO para hoje, ISO para outros (toDateStr para todos)
+    const key=toDateStr(date);
+    const tasksForDay = isToday
+      ? Object.values(todayTasks).some(a=>a.length>0)
+      : weekTasks[key]&&Object.values(weekTasks[key]).some(a=>a.length>0);
     const cell=document.createElement('div');
     cell.className='week-cal-day'+(isToday?' today-cal':'')+(isSel?' selected':'');
     const name=document.createElement('div');name.className='week-cal-name';name.textContent=WEEK_SHORT[i];
     const num=document.createElement('div');num.className='week-cal-num';num.textContent=date.getDate();
-    const dot=document.createElement('div');dot.className='week-cal-dot';dot.style.visibility=hasTasks?'visible':'hidden';
+    const dot=document.createElement('div');dot.className='week-cal-dot';dot.style.visibility=tasksForDay?'visible':'hidden';
     cell.appendChild(name);cell.appendChild(num);cell.appendChild(dot);
     cell.addEventListener('click',()=>{selectedWeekDay=date;renderWeekCal();renderWeekDayTasks();});
     cal.appendChild(cell);
@@ -911,12 +954,20 @@ function renderWeekDayTasks(){
   const container=document.getElementById('week-day-cats');container.innerHTML='';
   if(!selectedWeekDay){subEl.textContent='Selecione um dia acima';return;}
   const date=selectedWeekDay;
-  const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
   const isToday=date.toDateString()===now.toDateString();
+  // Usa toDateStr para hoje (formato ISO), fmtDate para outros dias
+  const key = isToday ? toDateStr(now) : toDateStr(date);
   titleEl.textContent=isToday?`Hoje — ${DIAS_PT[date.getDay()]}`:DIAS_PT[date.getDay()];
   subEl.textContent=`${date.getDate()} de ${MESES_PT[date.getMonth()].toLowerCase()} de ${date.getFullYear()}`;
   if(!categories.length){container.innerHTML='<p style="font-size:13px;color:var(--hint)">Adicione categorias em Configurações.</p>';return;}
-  categories.forEach(cat=>container.appendChild(makeCategoryBlock(cat,(weekTasks[key]&&weekTasks[key][cat])||[],key)));
+  // Para hoje: usa todayTasks (mesma fonte do Hoje)
+  // Para outros dias: usa weekTasks[key]
+  categories.forEach(cat=>{
+    const tasks = isToday
+      ? (todayTasks[cat]||[])
+      : ((weekTasks[key]&&weekTasks[key][cat])||[]);
+    container.appendChild(makeCategoryBlock(cat, tasks, key));
+  });
 }
 
 // ═══════════════════════════════
@@ -1184,31 +1235,130 @@ function renderDiaryEntry(){
 // ═══════════════════════════════
 function initReportSelect(){
   const sel=document.getElementById('report-month-sel');
-  for(let m=0;m<12;m++){const opt=document.createElement('option');opt.value=m;opt.textContent=`${MESES_PT[m]} ${currentYear}`;if(m===currentMonth)opt.selected=true;sel.appendChild(opt);}
+  sel.innerHTML='';
+  for(let m=0;m<12;m++){
+    const opt=document.createElement('option');
+    opt.value=m;
+    opt.textContent=`${MESES_PT[m]} ${currentYear}`;
+    if(m===currentMonth) opt.selected=true;
+    sel.appendChild(opt);
+  }
   sel.addEventListener('change',renderReport);
 }
-function renderReport(){
-  const m=parseInt(document.getElementById('report-month-sel').value),y=currentYear,days=daysInMonth(y,m);
-  const hDiv=document.getElementById('report-habits');hDiv.innerHTML='';
-  if(!habits.length){hDiv.innerHTML='<p style="font-size:13px;color:var(--hint)">Nenhum hábito registrado.</p>';}
-  else habits.forEach(h=>{
-    let c=0;for(let d=1;d<=days;d++)if(habitData[`${y}-${m}-${d}-${h}`])c++;
-    const pct=Math.round(c/days*100);
-    const row=document.createElement('div');row.className='report-habit-row';
-    const nm=document.createElement('span');nm.textContent=h;nm.style.cssText='min-width:100px;font-size:13px';
-    const bw=document.createElement('div');bw.className='report-bar-wrap';
-    const bar=document.createElement('div');bar.className='report-bar';bar.style.width=pct+'%';bw.appendChild(bar);
-    const pe=document.createElement('div');pe.className='report-pct';pe.textContent=pct+'%';
-    row.appendChild(nm);row.appendChild(bw);row.appendChild(pe);hDiv.appendChild(row);
+
+async function renderReport(){
+  const m=parseInt(document.getElementById('report-month-sel').value);
+  const y=currentYear;
+  const days=daysInMonth(y,m);
+  const uid=currentUser.id;
+  const monthStart=`${y}-${String(m+1).padStart(2,'0')}-01`;
+  const monthEnd=`${y}-${String(m+1).padStart(2,'0')}-${String(days).padStart(2,'0')}`;
+
+  // ── Busca dados do mês selecionado direto do Supabase ──
+  const [{data:hlogs},{data:slogs},{data:grats}] = await Promise.all([
+    sb.from('habit_logs').select('*').eq('user_id',uid).gte('log_date',monthStart).lte('log_date',monthEnd),
+    sb.from('sleep_logs').select('*').eq('user_id',uid).gte('log_date',monthStart).lte('log_date',monthEnd),
+    sb.from('gratitude').select('*').eq('user_id',uid).gte('log_date',monthStart).lte('log_date',monthEnd)
+  ]);
+
+  // Indexa por dia
+  const hMap={}, sMap={}, gMap={};
+  (hlogs||[]).forEach(l=>{ const d=new Date(l.log_date+'T12:00:00').getDate(); if(!hMap[d]) hMap[d]={}; hMap[d][l.habit_name]=l.done; });
+  (slogs||[]).forEach(l=>{ const d=new Date(l.log_date+'T12:00:00').getDate(); sMap[d]={dormir:l.sleep_time?l.sleep_time.slice(0,5):'',acordar:l.wake_time?l.wake_time.slice(0,5):''}; });
+  (grats||[]).forEach(l=>{ const d=new Date(l.log_date+'T12:00:00').getDate(); gMap[d]=l.content; });
+
+  // ── HÁBITOS — mesmo grid ──
+  const thead=document.getElementById('rep-habits-thead');
+  const tbody=document.getElementById('rep-habits-tbody');
+  thead.innerHTML=''; tbody.innerHTML='';
+
+  const trh=document.createElement('tr');
+  const thN=document.createElement('th');thN.textContent='Hábito';thN.style.textAlign='left';thN.style.padding='5px 8px';trh.appendChild(thN);
+  for(let d=1;d<=days;d++){const th=document.createElement('th');th.textContent=d;trh.appendChild(th);}
+  thead.appendChild(trh);
+
+  habits.forEach(habit=>{
+    const tr=document.createElement('tr');
+    const tdN=document.createElement('td');tdN.className='habit-name';tdN.textContent=habit;tr.appendChild(tdN);
+    for(let d=1;d<=days;d++){
+      const done=hMap[d]&&hMap[d][habit];
+      const td=document.createElement('td');
+      const cell=document.createElement('div');
+      cell.className='habit-cell'+(done?' checked':'');
+      td.appendChild(cell);tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
   });
-  const sDiv=document.getElementById('report-sleep');sDiv.innerHTML='';
+
+  if(!habits.length){
+    const tr=document.createElement('tr');
+    const td=document.createElement('td');td.colSpan=days+1;td.style.padding='8px';td.style.fontSize='12px';td.style.color='var(--hint)';td.textContent='Nenhum hábito registrado.';
+    tr.appendChild(td);tbody.appendChild(tr);
+  }
+
+  // ── SONO — mesmo gráfico ──
+  drawReportSonoChart(sMap, days, y, m);
+
+  // Stats
   let totalH=0,cntS=0;
-  for(let d=1;d<=days;d++){const e=sonoData[fmtDate(y,m,d)]||{};const h=calcSonoHours(e.dormir,e.acordar);if(h!==null){totalH+=h;cntS++;}}
+  for(let d=1;d<=days;d++){
+    const e=sMap[d]||{};
+    const h=calcSonoHours(e.dormir,e.acordar);
+    if(h!==null){totalH+=h;cntS++;}
+  }
   const avg=cntS>0?(totalH/cntS).toFixed(1):'—';
-  sDiv.innerHTML=`<div class="report-stat"><div class="report-stat-num">${avg}h</div><div class="report-stat-label">Média de sono</div></div><div class="report-stat"><div class="report-stat-num">${cntS}</div><div class="report-stat-label">Dias registrados</div></div><div class="report-stat"><div class="report-stat-num">${cntS>0?totalH.toFixed(0):'—'}h</div><div class="report-stat-label">Total no mês</div></div>`;
-  const gDiv=document.getElementById('report-gratitude');gDiv.innerHTML='';
-  for(let d=1;d<=days;d++){const val=gratData[fmtDate(y,m,d)];if(!val)continue;const en=document.createElement('div');en.className='report-gratitude-entry';const de=document.createElement('div');de.className='report-g-day';de.textContent=d;const te=document.createElement('div');te.textContent=val;en.appendChild(de);en.appendChild(te);gDiv.appendChild(en);}
-  if(!gDiv.children.length)gDiv.innerHTML='<p style="font-size:13px;color:var(--hint)">Nenhum registro este mês.</p>';
+  const statsDiv=document.getElementById('rep-sleep-stats');
+  statsDiv.innerHTML=`
+    <div class="report-stat"><div class="report-stat-num">${avg}h</div><div class="report-stat-label">Média de sono</div></div>
+    <div class="report-stat"><div class="report-stat-num">${cntS}</div><div class="report-stat-label">Dias registrados</div></div>
+    <div class="report-stat"><div class="report-stat-num">${cntS>0?totalH.toFixed(0):'—'}h</div><div class="report-stat-label">Total no mês</div></div>
+  `;
+
+  // ── GRATIDÃO — mesma lista ──
+  const gList=document.getElementById('rep-gratitude-list');
+  gList.innerHTML='';
+  for(let d=1;d<=days;d++){
+    const val=gMap[d];
+    const row=document.createElement('div');row.className='gratitude-row';
+    const de=document.createElement('div');de.className='gratitude-day';de.textContent=d;
+    const txt=document.createElement('div');
+    txt.style.cssText='font-size:13.5px;color:'+(val?'var(--text)':'var(--hint)')+';padding-top:2px;line-height:1.5';
+    txt.textContent=val||'—';
+    row.appendChild(de);row.appendChild(txt);gList.appendChild(row);
+  }
+}
+
+function drawReportSonoChart(sMap, days, y, m){
+  const svg=document.getElementById('rep-sono-chart');if(!svg)return;
+  const dark=document.body.classList.contains('dark-mode');
+  const colDot=dark?'#3a3a38':'#d8d6ce';
+  const colLine=dark?'#3a3a38':'#e8e6de';
+  const colLabel=dark?'#6a6a68':'#b8b6ae';
+  const colStroke=dark?'#f0efe9':'#1a1a18';
+
+  const W=svg.parentElement.clientWidth||680,H=160,pL=32,pR=16,pT=16,pB=28;
+  const cW=W-pL-pR,cH=H-pT-pB,minH=3,maxH=12;
+  const ns='http://www.w3.org/2000/svg';
+  svg.setAttribute('width',W);svg.setAttribute('height',H);svg.innerHTML='';
+  const xs=d=>pL+((d-1)/(days-1))*cW;
+  const ys=h=>pT+cH-((h-minH)/(maxH-minH))*cH;
+
+  for(let r=0;r<=4;r++){const yy=pT+(r/4)*cH;for(let c=0;c<days;c++){const cc=document.createElementNS(ns,'circle');cc.setAttribute('cx',xs(c+1));cc.setAttribute('cy',yy);cc.setAttribute('r','1');cc.setAttribute('fill',colDot);svg.appendChild(cc);}}
+  [5,6,7,8,9,10,11].forEach(v=>{
+    if(v<minH||v>maxH)return;
+    const ln=document.createElementNS(ns,'line');ln.setAttribute('x1',pL);ln.setAttribute('y1',ys(v));ln.setAttribute('x2',pL+cW);ln.setAttribute('y2',ys(v));ln.setAttribute('stroke',colLine);ln.setAttribute('stroke-width','0.5');svg.appendChild(ln);
+    const t=document.createElementNS(ns,'text');t.setAttribute('x',pL-6);t.setAttribute('y',ys(v)+4);t.setAttribute('text-anchor','end');t.setAttribute('font-size','9');t.setAttribute('fill',colLabel);t.setAttribute('font-family','DM Sans,sans-serif');t.textContent=v;svg.appendChild(t);
+  });
+  for(let d=1;d<=days;d+=5){const t=document.createElementNS(ns,'text');t.setAttribute('x',xs(d));t.setAttribute('y',H-6);t.setAttribute('text-anchor','middle');t.setAttribute('font-size','9');t.setAttribute('fill',colLabel);t.setAttribute('font-family','DM Sans,sans-serif');t.textContent=d;svg.appendChild(t);}
+
+  const pts=[];
+  for(let d=1;d<=days;d++){
+    const e=sMap[d]||{};
+    pts.push({d,h:calcSonoHours(e.dormir,e.acordar)});
+  }
+  const valid=pts.filter(p=>p.h!==null);if(valid.length<2)return;
+  const poly=document.createElementNS(ns,'polyline');poly.setAttribute('points',valid.map(p=>`${xs(p.d)},${ys(p.h)}`).join(' '));poly.setAttribute('fill','none');poly.setAttribute('stroke',colStroke);poly.setAttribute('stroke-width','1.5');poly.setAttribute('stroke-linejoin','round');poly.setAttribute('stroke-linecap','round');svg.appendChild(poly);
+  valid.forEach(p=>{const c=document.createElementNS(ns,'circle');c.setAttribute('cx',xs(p.d));c.setAttribute('cy',ys(p.h));c.setAttribute('r','2.5');c.setAttribute('fill',colStroke);svg.appendChild(c);});
 }
 
 // ═══════════════════════════════
@@ -1447,6 +1597,21 @@ function exportReportPDF(mode){
   win.onload=()=>{win.focus();win.print();};
 }
 
+// ── RESET MENSAL ──
+// Se o mês mudou desde a última visita, zera hábitos e sono em memória
+// (os dados antigos ficam no banco, acessíveis pelo Relatório)
+function checkMonthReset(){
+  const lastMonth=localStorage.getItem('lastVisitMonth');
+  const thisMonth=`${currentYear}-${currentMonth}`;
+  localStorage.setItem('lastVisitMonth',thisMonth);
+  if(lastMonth && lastMonth!==thisMonth){
+    // Zera memória — o loadAllData já carrega só o mês atual
+    habitData={};
+    sonoData={};
+    gratData={};
+  }
+}
+
 // ═══════════════════════════════
 //  DARK MODE
 // ═══════════════════════════════
@@ -1479,6 +1644,7 @@ function initDarkMode(){
 // ═══════════════════════════════
 async function init(){
   initDarkMode();
+  checkMonthReset();
   const ok = await authGuard();
   if(!ok) return;
 
@@ -1520,27 +1686,39 @@ async function loadAllData(){
   if(habs?.length) habits = habs.map(h => h.name);
   else if(!habits.length) habits = ['Exercício','Meditação','Leitura'];
 
-  // Tarefas de hoje
+  // Tarefas — carrega semana inteira (hoje incluso)
+  // Hoje mostra task_date = hoje; Semana mostra por dia
   const todayStr = toDateStr(now);
-  const { data: todayT } = await sb.from('tasks').select('*').eq('user_id', uid).eq('task_date', todayStr).order('position');
-  if(todayT){
-    todayTasks = {};
-    todayT.forEach(t => {
-      if(!todayTasks[t.category]) todayTasks[t.category] = [];
-      todayTasks[t.category].push({ id: t.id, text: t.text, done: t.done, recurId: t.recur_id });
-    });
-  }
-
-  // Tarefas da semana (semana atual)
   const weekDts = getWeekDates(weekOffset);
   const wStart = toDateStr(weekDts[0]), wEnd = toDateStr(weekDts[6]);
-  const { data: weekT } = await sb.from('tasks').select('*').eq('user_id', uid).gte('task_date', wStart).lte('task_date', wEnd).order('position');
-  if(weekT){
-    weekTasks = {};
-    weekT.forEach(t => {
+
+  // Garante que hoje está dentro da janela (pode estar fora se weekOffset != 0)
+  const rangeStart = todayStr < wStart ? todayStr : wStart;
+  const rangeEnd   = todayStr > wEnd   ? todayStr : wEnd;
+
+  const { data: allT } = await sb.from('tasks').select('*')
+    .eq('user_id', uid)
+    .gte('task_date', rangeStart)
+    .lte('task_date', rangeEnd)
+    .order('position');
+
+  todayTasks = {};
+  weekTasks  = {};
+
+  if(allT){
+    allT.forEach(t => {
+      const task = { id: t.id, text: t.text, done: t.done, recurId: t.recur_id };
+
+      // Semana — indexado por task_date
       if(!weekTasks[t.task_date]) weekTasks[t.task_date] = {};
       if(!weekTasks[t.task_date][t.category]) weekTasks[t.task_date][t.category] = [];
-      weekTasks[t.task_date][t.category].push({ id: t.id, text: t.text, done: t.done, recurId: t.recur_id });
+      weekTasks[t.task_date][t.category].push(task);
+
+      // Hoje — só as de hoje
+      if(t.task_date === todayStr){
+        if(!todayTasks[t.category]) todayTasks[t.category] = [];
+        todayTasks[t.category].push(task);
+      }
     });
   }
 
