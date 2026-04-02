@@ -3,9 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Meu Dia</title>
+<title>My Bullet Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ── SUPABASE INIT + AUTH GUARD (roda antes do DOM) ──
+const SUPABASE_URL = 'https://pofrbfqndzfisfdcrovv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvZnJiZnFuZHpmaXNmZGNyb3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODIwMjQsImV4cCI6MjA5MDY1ODAyNH0.fAI12m4z-WjHdWu87wtOEVhahWWvB71HCz8v355yI7M';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentUser = null;
+
+async function authGuard(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){ window.location.href = 'login.html'; return false; }
+  currentUser = session.user;
+  // Busca nome atualizado do perfil
+  const { data: profile } = await sb.from('profiles').select('name').eq('id', currentUser.id).single();
+  if(profile?.name) localStorage.setItem('userName', profile.name);
+  return true;
+}
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -456,16 +474,15 @@ function load(k,d){try{const v=localStorage.getItem(k);return v!==null?JSON.pars
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function uid(){return Math.random().toString(36).slice(2,9);}
 
-let categories = load('categories',['Profissional','Saúde','Pessoal']);
-let habits     = load('habits',['Exercício','Meditação','Leitura']);
-let todayTasks = load('todayTasks',{});
-let weekTasks  = load('weekTasks',{});
-let habitData  = load('habitData',{});
-let sonoData   = load('sonoData',{});
-let gratData   = load('gratData',{});
-let recurring  = load('recurring',[]);
-// diaryData: { 'Y-M-D': { energia:0, humor:0, aconteceu:'', relevante:'', aprendizado:'', padrao:'', acao:'', proximaAcao:'', ideiasConteudo:'', ideiasNegocio:'', ideiasMP:'' } }
-let diaryData  = load('diaryData',{});
+let categories = ['Profissional','Saúde','Pessoal'];
+let habits     = ['Exercício','Meditação','Leitura'];
+let todayTasks = {};
+let weekTasks  = {};
+let habitData  = {};
+let sonoData   = {};
+let gratData   = {};
+let recurring  = [];
+let diaryData  = {};
 
 // ═══════════════════════════════
 //  DATES / HELPERS
@@ -500,10 +517,12 @@ function injectRecurring(){
     if(!r.days.includes(todayDow)) return;
     const cat=r.category||(categories[0]||'Geral');
     if(!todayTasks[cat]) todayTasks[cat]=[];
-    if(!todayTasks[cat].find(t=>t.recurId===r.id))
-      todayTasks[cat].push({id:uid(),recurId:r.id,text:r.text,done:false});
+    if(!todayTasks[cat].find(t=>t.recurId===r.id)){
+      const t={id:uid(),recurId:r.id,text:r.text,done:false};
+      todayTasks[cat].push(t);
+      saveTask(t,cat,toDateStr(now));
+    }
   });
-  save('todayTasks',todayTasks);
   getWeekDates(weekOffset).forEach(date=>{
     const dow=date.getDay();
     const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
@@ -512,11 +531,13 @@ function injectRecurring(){
       if(!r.days.includes(dow)) return;
       const cat=r.category||(categories[0]||'Geral');
       if(!weekTasks[key][cat]) weekTasks[key][cat]=[];
-      if(!weekTasks[key][cat].find(t=>t.recurId===r.id))
-        weekTasks[key][cat].push({id:uid(),recurId:r.id,text:r.text,done:false});
+      if(!weekTasks[key][cat].find(t=>t.recurId===r.id)){
+        const t={id:uid(),recurId:r.id,text:r.text,done:false};
+        weekTasks[key][cat].push(t);
+        saveTask(t,cat,toDateStr(date));
+      }
     });
   });
-  save('weekTasks',weekTasks);
 }
 
 // ═══════════════════════════════
@@ -576,8 +597,17 @@ function persistOrder(listEl){
   const cat=listEl.dataset.cat;if(!cat)return;
   const key=listEl.dataset.daykey;
   const ids=[...listEl.querySelectorAll('.task-item')].map(el=>el.dataset.tid).filter(Boolean);
-  if(key){if(weekTasks[key]&&weekTasks[key][cat]){weekTasks[key][cat]=ids.map(id=>weekTasks[key][cat].find(t=>t.id===id)).filter(Boolean);save('weekTasks',weekTasks);}}
-  else{if(todayTasks[cat]){todayTasks[cat]=ids.map(id=>todayTasks[cat].find(t=>t.id===id)).filter(Boolean);save('todayTasks',todayTasks);}}
+  if(key){
+    if(weekTasks[key]&&weekTasks[key][cat]){
+      weekTasks[key][cat]=ids.map(id=>weekTasks[key][cat].find(t=>t.id===id)).filter(Boolean);
+      weekTasks[key][cat].forEach((t,i)=>sb.from('tasks').update({position:i}).eq('id',t.id).eq('user_id',currentUser.id));
+    }
+  } else {
+    if(todayTasks[cat]){
+      todayTasks[cat]=ids.map(id=>todayTasks[cat].find(t=>t.id===id)).filter(Boolean);
+      todayTasks[cat].forEach((t,i)=>sb.from('tasks').update({position:i}).eq('id',t.id).eq('user_id',currentUser.id));
+    }
+  }
 }
 
 // ═══════════════════════════════
@@ -595,8 +625,10 @@ function makeCategoryBlock(cat,tasks,dayKey){
   inp.addEventListener('keydown',e=>{
     if(e.key!=='Enter'||!inp.value.trim())return;
     const t={id:uid(),text:inp.value.trim(),done:false};
-    if(dayKey){if(!weekTasks[dayKey])weekTasks[dayKey]={};if(!weekTasks[dayKey][cat])weekTasks[dayKey][cat]=[];weekTasks[dayKey][cat].push(t);save('weekTasks',weekTasks);}
-    else{if(!todayTasks[cat])todayTasks[cat]=[];todayTasks[cat].push(t);save('todayTasks',todayTasks);}
+    const dateStr=dayKey||toDateStr(now);
+    if(dayKey){if(!weekTasks[dayKey])weekTasks[dayKey]={};if(!weekTasks[dayKey][cat])weekTasks[dayKey][cat]=[];weekTasks[dayKey][cat].push(t);}
+    else{if(!todayTasks[cat])todayTasks[cat]=[];todayTasks[cat].push(t);}
+    saveTask(t,cat,dateStr);
     inp.value='';list.insertBefore(makeTaskItem(cat,t,dayKey),addRow);
     if(dayKey)renderWeekCal();
   });
@@ -608,14 +640,21 @@ function makeTaskItem(cat,task,dayKey){
   const row=document.createElement('div');row.className='task-item';row.dataset.tid=task.id;
   const handle=document.createElement('span');handle.className='drag-handle';handle.textContent='⠿';
   const chk=document.createElement('div');chk.className='task-check'+(task.done?' done':'');
-  chk.addEventListener('click',()=>{task.done=!task.done;chk.classList.toggle('done');txt.classList.toggle('done-text',task.done);dayKey?save('weekTasks',weekTasks):save('todayTasks',todayTasks);});
+  chk.addEventListener('click',()=>{
+    task.done=!task.done;chk.classList.toggle('done');txt.classList.toggle('done-text',task.done);
+    saveTask(task,cat,dayKey||toDateStr(now));
+  });
   const txt=document.createElement('div');txt.className='task-text'+(task.done?' done-text':'');txt.contentEditable=true;txt.textContent=task.text;
-  txt.addEventListener('blur',()=>{task.text=txt.textContent.trim()||task.text;dayKey?save('weekTasks',weekTasks):save('todayTasks',todayTasks);});
+  txt.addEventListener('blur',()=>{
+    task.text=txt.textContent.trim()||task.text;
+    saveTask(task,cat,dayKey||toDateStr(now));
+  });
   txt.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();txt.blur();}});
   const del=document.createElement('button');del.className='task-del';del.textContent='×';
   del.addEventListener('click',()=>{
-    if(dayKey){weekTasks[dayKey][cat]=(weekTasks[dayKey][cat]||[]).filter(t=>t.id!==task.id);save('weekTasks',weekTasks);}
-    else{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);save('todayTasks',todayTasks);}
+    deleteTask(task.id);
+    if(dayKey){weekTasks[dayKey][cat]=(weekTasks[dayKey][cat]||[]).filter(t=>t.id!==task.id);}
+    else{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);}
     row.remove();
   });
   row.appendChild(handle);row.appendChild(chk);row.appendChild(txt);row.appendChild(del);makeDraggable(row);
@@ -715,7 +754,7 @@ function renderHabitos(){
       const td=document.createElement('td');
       const cell=document.createElement('div');
       cell.className='habit-cell'+(habitData[key]?' checked':'')+(d===todayDate?' today-col':'');
-      cell.addEventListener('click',()=>{habitData[key]=!habitData[key];save('habitData',habitData);cell.classList.toggle('checked');});
+      cell.addEventListener('click',()=>{habitData[key]=!habitData[key];cell.classList.toggle('checked');saveHabitLog(habit,fmtDateISO(currentYear,currentMonth,d),habitData[key]);});
       td.appendChild(cell);tr.appendChild(td);
     }
     tbody.appendChild(tr);
@@ -723,7 +762,7 @@ function renderHabitos(){
   const trA=document.createElement('tr');trA.className='habit-add-row';
   const tdA=document.createElement('td');tdA.colSpan=days+1;
   const inp=document.createElement('input');inp.className='habit-add-input';inp.placeholder='Adicionar hábito...';
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){habits.push(inp.value.trim());save('habits',habits);inp.value='';renderHabitos();renderConfigHabits();}});
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){habits.push(inp.value.trim());saveHabits();inp.value='';renderHabitos();renderConfigHabits();}});
   tdA.appendChild(inp);trA.appendChild(tdA);tbody.appendChild(trA);
   renderSono();
 }
@@ -751,7 +790,8 @@ function renderSono(){
     if(hv!==null){tot.textContent=hv+'h';tot.className='sono-total '+(hv>=7?'good':'bad');}
     const onChange=()=>{
       if(!sonoData[key])sonoData[key]={dormir:'',acordar:''};
-      sonoData[key].dormir=i1.value;sonoData[key].acordar=i2.value;save('sonoData',sonoData);
+      sonoData[key].dormir=i1.value;sonoData[key].acordar=i2.value;
+      saveSleepLog(fmtDateISO(currentYear,currentMonth,d),i1.value,i2.value);
       const h2=calcSonoHours(i1.value,i2.value);
       if(h2!==null){tot.textContent=h2+'h';tot.className='sono-total '+(h2>=7?'good':'bad');}
       else{tot.textContent='';tot.className='sono-total';}
@@ -799,7 +839,7 @@ function renderGratidao(){
     const de=document.createElement('div');de.className='gratitude-day';de.textContent=d;
     const ta=document.createElement('textarea');ta.className='gratitude-input';ta.rows=1;
     ta.placeholder=d===todayDate?'O que você agradece hoje?':'';ta.value=val;
-    ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';gratData[key]=ta.value;save('gratData',gratData);});
+    ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';gratData[key]=ta.value;saveGratitude(fmtDateISO(currentYear,currentMonth,d),ta.value);});
     if(val)setTimeout(()=>{ta.style.height=ta.scrollHeight+'px';},0);
     row.appendChild(de);row.appendChild(ta);list.appendChild(row);
   }
@@ -908,8 +948,8 @@ function renderDiaryEntry(){
       btn.textContent=i;btn.type='button';
       btn.addEventListener('click',()=>{
         entry[field]=entry[field]===i?0:i;
-        save('diaryData',diaryData);
         btns.querySelectorAll('.scale-btn').forEach((b,idx)=>b.classList.toggle('on',(idx+1)===entry[field]));
+        saveDiaryEntry(toDateStr(diaryDate),entry);
       });
       btns.appendChild(btn);
     }
@@ -928,7 +968,13 @@ function renderDiaryEntry(){
         const fl=document.createElement('div');fl.className='diary-field-label';fl.textContent=f.label;fieldDiv.appendChild(fl);
       }
       const ta=document.createElement('textarea');ta.className='diary-textarea';ta.placeholder=f.ph;ta.value=entry[f.key]||'';ta.rows=2;
-      ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';entry[f.key]=ta.value;save('diaryData',diaryData);});
+      let diaryTimer;
+      ta.addEventListener('input',()=>{
+        ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
+        entry[f.key]=ta.value;
+        clearTimeout(diaryTimer);
+        diaryTimer=setTimeout(()=>saveDiaryEntry(toDateStr(diaryDate),entry),800);
+      });
       setTimeout(()=>{ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';},0);
       fieldDiv.appendChild(ta);secDiv.appendChild(fieldDiv);
     });
@@ -976,14 +1022,14 @@ function renderConfigCats(){
   categories.forEach((cat,i)=>{
     const tag=document.createElement('div');tag.className='config-tag';tag.textContent=cat;
     const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';
-    del.addEventListener('click',()=>{categories.splice(i,1);save('categories',categories);renderConfigCats();renderHoje();refreshRecurCatSel();});
+    del.addEventListener('click',()=>{categories.splice(i,1);saveCategories();renderConfigCats();renderHoje();refreshRecurCatSel();});
     tag.appendChild(del);list.appendChild(tag);
   });
 }
 function addCategory(){
   const inp=document.getElementById('cat-input');const val=inp.value.trim();
   if(!val||categories.includes(val)){inp.value='';return;}
-  categories.push(val);save('categories',categories);inp.value='';renderConfigCats();renderHoje();refreshRecurCatSel();
+  categories.push(val);saveCategories();inp.value='';renderConfigCats();renderHoje();refreshRecurCatSel();
 }
 document.getElementById('cat-input').addEventListener('keydown',e=>{if(e.key==='Enter')addCategory();});
 
@@ -993,14 +1039,14 @@ function renderConfigHabits(){
     const item=document.createElement('div');item.className='config-habit-item';
     const nm=document.createElement('span');nm.textContent=h;
     const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';del.style.fontSize='16px';
-    del.addEventListener('click',()=>{habits.splice(i,1);save('habits',habits);renderConfigHabits();renderHabitos();});
+    del.addEventListener('click',()=>{habits.splice(i,1);saveHabits();renderConfigHabits();renderHabitos();});
     item.appendChild(nm);item.appendChild(del);list.appendChild(item);
   });
 }
 function addHabit(){
   const inp=document.getElementById('habit-input');const val=inp.value.trim();
   if(!val||habits.includes(val)){inp.value='';return;}
-  habits.push(val);save('habits',habits);inp.value='';renderConfigHabits();renderHabitos();
+  habits.push(val);saveHabits();inp.value='';renderConfigHabits();renderHabitos();
 }
 document.getElementById('habit-input').addEventListener('keydown',e=>{if(e.key==='Enter')addHabit();});
 
@@ -1029,7 +1075,7 @@ function renderRecurList(){
     const dl=document.createElement('div');dl.className='recur-item-days';dl.textContent=r.days.length===7?'Todos os dias':r.days.map(d=>DOW_SHORT[d]).join(', ');
     left.appendChild(nm);left.appendChild(ct);left.appendChild(dl);
     const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';del.style.fontSize='18px';
-    del.addEventListener('click',()=>{recurring.splice(i,1);save('recurring',recurring);renderRecurList();});
+    del.addEventListener('click',()=>{recurring.splice(i,1);saveRecurring();renderRecurList();});
     item.appendChild(left);item.appendChild(del);list.appendChild(item);
   });
 }
@@ -1039,7 +1085,7 @@ function addRecurring(){
   if(!nameVal){document.getElementById('recur-name').focus();return;}
   if(!recurDaysSel.length){alert('Selecione ao menos um dia.');return;}
   const r={id:uid(),text:nameVal,category:catVal,days:[...recurDaysSel].sort()};
-  recurring.push(r);save('recurring',recurring);
+  recurring.push(r);saveRecurring();
   document.getElementById('recur-name').value='';
   recurDaysSel=[];initRecurPicker();renderRecurList();injectRecurring();renderHoje();
   if(selectedWeekDay)renderWeekDayTasks();
@@ -1207,7 +1253,13 @@ function exportReportPDF(mode){
 // ═══════════════════════════════
 //  INIT
 // ═══════════════════════════════
-function init(){
+async function init(){
+  const ok = await authGuard();
+  if(!ok) return;
+
+  // Carrega dados do Supabase
+  await loadAllData();
+
   initDates();
   injectRecurring();
   renderHoje();
@@ -1225,7 +1277,211 @@ function init(){
   renderRecurList();
   initExportSelects();
 }
+
+// ═══════════════════════════════
+//  SUPABASE DATA LOADERS
+// ═══════════════════════════════
+async function loadAllData(){
+  const uid = currentUser.id;
+  const y = currentYear, m = currentMonth;
+
+  // Categorias
+  const { data: cats } = await sb.from('categories').select('name').eq('user_id', uid).order('position');
+  if(cats?.length) categories = cats.map(c => c.name);
+  else if(!categories.length) categories = ['Profissional','Saúde','Pessoal'];
+
+  // Hábitos
+  const { data: habs } = await sb.from('habits').select('name').eq('user_id', uid).order('position');
+  if(habs?.length) habits = habs.map(h => h.name);
+  else if(!habits.length) habits = ['Exercício','Meditação','Leitura'];
+
+  // Tarefas de hoje
+  const todayStr = toDateStr(now);
+  const { data: todayT } = await sb.from('tasks').select('*').eq('user_id', uid).eq('task_date', todayStr).order('position');
+  if(todayT){
+    todayTasks = {};
+    todayT.forEach(t => {
+      if(!todayTasks[t.category]) todayTasks[t.category] = [];
+      todayTasks[t.category].push({ id: t.id, text: t.text, done: t.done, recurId: t.recur_id });
+    });
+  }
+
+  // Tarefas da semana (semana atual)
+  const weekDts = getWeekDates(weekOffset);
+  const wStart = toDateStr(weekDts[0]), wEnd = toDateStr(weekDts[6]);
+  const { data: weekT } = await sb.from('tasks').select('*').eq('user_id', uid).gte('task_date', wStart).lte('task_date', wEnd).order('position');
+  if(weekT){
+    weekTasks = {};
+    weekT.forEach(t => {
+      if(!weekTasks[t.task_date]) weekTasks[t.task_date] = {};
+      if(!weekTasks[t.task_date][t.category]) weekTasks[t.task_date][t.category] = [];
+      weekTasks[t.task_date][t.category].push({ id: t.id, text: t.text, done: t.done, recurId: t.recur_id });
+    });
+  }
+
+  // Tarefas recorrentes
+  const { data: recT } = await sb.from('recurring_tasks').select('*').eq('user_id', uid);
+  if(recT) recurring = recT.map(r => ({ id: r.id, text: r.text, category: r.category, days: r.days }));
+
+  // Habit logs do mês
+  const { data: hlogs } = await sb.from('habit_logs').select('*').eq('user_id', uid)
+    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
+    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+  if(hlogs){
+    habitData = {};
+    hlogs.forEach(l => {
+      const d = new Date(l.log_date + 'T12:00:00').getDate();
+      habitData[`${y}-${m}-${d}-${l.habit_name}`] = l.done;
+    });
+  }
+
+  // Sono do mês
+  const { data: slogs } = await sb.from('sleep_logs').select('*').eq('user_id', uid)
+    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
+    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+  if(slogs){
+    sonoData = {};
+    slogs.forEach(l => {
+      const d = new Date(l.log_date + 'T12:00:00').getDate();
+      sonoData[fmtDate(y,m,d)] = {
+        dormir: l.sleep_time ? l.sleep_time.slice(0,5) : '',
+        acordar: l.wake_time ? l.wake_time.slice(0,5) : ''
+      };
+    });
+  }
+
+  // Gratidão do mês
+  const { data: grats } = await sb.from('gratitude').select('*').eq('user_id', uid)
+    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
+    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+  if(grats){
+    gratData = {};
+    grats.forEach(g => {
+      const d = new Date(g.log_date + 'T12:00:00').getDate();
+      gratData[fmtDate(y,m,d)] = g.content;
+    });
+  }
+
+  // Diário do mês
+  const { data: diary } = await sb.from('diary').select('*').eq('user_id', uid)
+    .gte('log_date', `${y}-${String(m+1).padStart(2,'0')}-01`)
+    .lte('log_date', `${y}-${String(m+1).padStart(2,'0')}-31`);
+  if(diary){
+    diaryData = {};
+    diary.forEach(e => {
+      const d = new Date(e.log_date + 'T12:00:00').getDate();
+      diaryData[fmtDate(y,m,d)] = {
+        energia: e.energia, humor: e.humor,
+        aconteceu: e.aconteceu, relevante: e.relevante,
+        aprendizado: e.aprendizado, padrao: e.padrao,
+        acao: e.acao, proximaAcao: e.proxima_acao,
+        ideiasConteudo: e.ideias_conteudo, ideiasNegocio: e.ideias_negocio, ideiasMP: e.ideias_mp
+      };
+    });
+  }
+}
+
+// ── DATE HELPERS FOR SUPABASE ──
+function toDateStr(date){
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+function fmtDateISO(y, m, d){
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+// ═══════════════════════════════
+//  SUPABASE SAVERS
+// ═══════════════════════════════
+// Sobrescreve as funções save() que eram localStorage
+// Categorias
+async function saveCategories(){
+  const uid = currentUser.id;
+  await sb.from('categories').delete().eq('user_id', uid);
+  if(categories.length){
+    await sb.from('categories').insert(categories.map((name, i) => ({ user_id: uid, name, position: i })));
+  }
+}
+
+// Hábitos
+async function saveHabits(){
+  const uid = currentUser.id;
+  await sb.from('habits').delete().eq('user_id', uid);
+  if(habits.length){
+    await sb.from('habits').insert(habits.map((name, i) => ({ user_id: uid, name, position: i })));
+  }
+}
+
+// Tarefa individual (upsert)
+async function saveTask(task, category, dateStr){
+  await sb.from('tasks').upsert({
+    id: task.id,
+    user_id: currentUser.id,
+    category,
+    text: task.text,
+    done: task.done,
+    task_date: dateStr,
+    recur_id: task.recurId || null
+  }, { onConflict: 'id' });
+}
+
+// Deletar tarefa
+async function deleteTask(taskId){
+  await sb.from('tasks').delete().eq('id', taskId).eq('user_id', currentUser.id);
+}
+
+// Habit log (toggle)
+async function saveHabitLog(habitName, dateISO, done){
+  if(done){
+    await sb.from('habit_logs').upsert({ user_id: currentUser.id, habit_name: habitName, log_date: dateISO, done: true }, { onConflict: 'user_id,habit_name,log_date' });
+  } else {
+    await sb.from('habit_logs').delete().eq('user_id', currentUser.id).eq('habit_name', habitName).eq('log_date', dateISO);
+  }
+}
+
+// Sono (upsert)
+async function saveSleepLog(dateISO, dormir, acordar){
+  await sb.from('sleep_logs').upsert({
+    user_id: currentUser.id, log_date: dateISO,
+    sleep_time: dormir || null, wake_time: acordar || null
+  }, { onConflict: 'user_id,log_date' });
+}
+
+// Gratidão (upsert)
+async function saveGratitude(dateISO, content){
+  if(content){
+    await sb.from('gratitude').upsert({ user_id: currentUser.id, log_date: dateISO, content }, { onConflict: 'user_id,log_date' });
+  } else {
+    await sb.from('gratitude').delete().eq('user_id', currentUser.id).eq('log_date', dateISO);
+  }
+}
+
+// Diário (upsert)
+async function saveDiaryEntry(dateISO, entry){
+  await sb.from('diary').upsert({
+    user_id: currentUser.id, log_date: dateISO,
+    energia: entry.energia, humor: entry.humor,
+    aconteceu: entry.aconteceu, relevante: entry.relevante,
+    aprendizado: entry.aprendizado, padrao: entry.padrao,
+    acao: entry.acao, proxima_acao: entry.proximaAcao,
+    ideias_conteudo: entry.ideiasConteudo, ideias_negocio: entry.ideiasNegocio, ideias_mp: entry.ideiasMP
+  }, { onConflict: 'user_id,log_date' });
+}
+
+// Recorrentes
+async function saveRecurring(){
+  const uid = currentUser.id;
+  await sb.from('recurring_tasks').delete().eq('user_id', uid);
+  if(recurring.length){
+    await sb.from('recurring_tasks').insert(recurring.map(r => ({ id: r.id, user_id: uid, text: r.text, category: r.category, days: r.days })));
+  }
+}
+
+// ── PATCH: integrar savers nas funções existentes ──
+// Sobrescreve save() do localStorage com no-op (dados agora vão pro Supabase via funções específicas)
+function save(k, v){ /* dados salvos via Supabase */ }
+
 init();
 </script>
 </body>
 </html>
+
