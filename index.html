@@ -1621,8 +1621,7 @@ async function saveHabits(){
 
 // Tarefa individual — insert ou update
 async function saveTask(task, category, dateStr){
-  // Tenta atualizar primeiro; se não existir, insere
-  const { data: existing } = await sb.from('tasks').select('id').eq('id', task.id).single();
+  const { data: existing } = await sb.from('tasks').select('id').eq('id', task.id).eq('user_id', currentUser.id).maybeSingle();
   if(existing){
     const { error } = await sb.from('tasks').update({
       text: task.text, done: task.done, category, task_date: dateStr
