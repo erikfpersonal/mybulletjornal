@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Bullet Journal</title>
+<link rel="icon" type="image/png" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -66,8 +67,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .sidebar-date{font-size:11px;color:var(--muted);font-weight:300;line-height:1.6}
 
 /* MAIN */
-.main{flex:1;overflow-y:auto;padding:2.5rem 3rem;max-width:780px}
-.page{display:none}
+.main{flex:1;overflow-y:auto;padding:2.5rem 3rem}
+.page{display:none;max-width:900px}
 .page.active{display:block;animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .page-header{margin-bottom:2rem}
@@ -301,8 +302,8 @@ table.habits-table{width:100%;border-collapse:collapse;font-size:12px}
     flex:1;
     overflow-y:auto;
     padding:1.25rem 1rem 6.5rem;
-    max-width:100%;
   }
+  .page{max-width:100%}
 
   /* Bottom navigation */
   .bottom-nav{
