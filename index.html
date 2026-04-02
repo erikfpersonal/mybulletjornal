@@ -251,7 +251,17 @@ table.habits-table{width:100%;border-collapse:collapse;font-size:12px}
 .dow-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:11px;color:var(--muted);cursor:pointer;transition:background .15s,color .15s;display:flex;align-items:center;justify-content:center}
 .dow-btn.on{background:var(--text);color:white;border-color:var(--text)}
 
-/* EXPORT */
+/* RECUR EDIT MODAL */
+.recur-edit-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+.recur-edit-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:400px;display:flex;flex-direction:column;gap:1rem}
+.recur-edit-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:.25rem}
+.recur-edit-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:.25rem}
+.recur-edit-btn-save{font-family:var(--sans);font-size:12px;color:white;background:var(--text);border:none;padding:6px 16px;border-radius:4px;cursor:pointer;transition:opacity .15s}
+.recur-edit-btn-save:hover{opacity:.8}
+.recur-edit-btn-cancel{font-family:var(--sans);font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--border);padding:6px 14px;border-radius:4px;cursor:pointer;transition:color .15s,border-color .15s}
+.recur-edit-btn-cancel:hover{color:var(--text);border-color:var(--text)}
+.recur-edit-btn-del{font-family:var(--sans);font-size:12px;color:#a33a2d;background:transparent;border:1px solid #e4b4ae;padding:6px 14px;border-radius:4px;cursor:pointer;transition:opacity .15s;margin-right:auto}
+.recur-edit-btn-del:hover{opacity:.75}
 .export-box{border:1px solid var(--border);border-radius:8px;padding:1.25rem;display:flex;flex-direction:column;gap:12px}
 .export-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .export-select{border:1px solid var(--border);background:var(--surface);font-family:var(--sans);font-size:13px;color:var(--text);padding:5px 10px;border-radius:4px;outline:none;cursor:pointer}
@@ -1413,19 +1423,118 @@ function refreshRecurCatSel(){
 }
 function renderRecurList(){
   const list=document.getElementById('recur-list');list.innerHTML='';
-  if(!recurring.length){list.innerHTML='<p style="font-size:12px;color:var(--hint);padding:6px 0">Nenhuma tarefa recorrente ainda.</p>';return;}
+  if(!recurring.length){
+    list.innerHTML='<p style="font-size:12px;color:var(--hint);padding:6px 0">Nenhuma tarefa recorrente ainda.</p>';
+    return;
+  }
   recurring.forEach((r,i)=>{
     const item=document.createElement('div');item.className='recur-item';
-    const left=document.createElement('div');
+    const left=document.createElement('div');left.style.flex='1';
     const nm=document.createElement('div');nm.className='recur-item-name';nm.textContent=r.text;
     const ct=document.createElement('div');ct.className='recur-item-cat';ct.textContent=r.category;
-    const dl=document.createElement('div');dl.className='recur-item-days';dl.textContent=r.days.length===7?'Todos os dias':r.days.map(d=>DOW_SHORT[d]).join(', ');
+    const dl=document.createElement('div');dl.className='recur-item-days';
+    dl.textContent=r.days.length===7?'Todos os dias':r.days.map(d=>DOW_SHORT[d]).join(', ');
     left.appendChild(nm);left.appendChild(ct);left.appendChild(dl);
-    const del=document.createElement('button');del.className='config-tag-del';del.textContent='×';del.style.fontSize='18px';
-    del.addEventListener('click',()=>{recurring.splice(i,1);saveRecurring();renderRecurList();});
-    item.appendChild(left);item.appendChild(del);list.appendChild(item);
+    const editBtn=document.createElement('button');
+    editBtn.style.cssText='font-family:var(--sans);font-size:11px;color:var(--muted);background:transparent;border:1px solid var(--border);padding:4px 12px;border-radius:4px;cursor:pointer;flex-shrink:0;transition:color .15s,border-color .15s';
+    editBtn.textContent='Editar';
+    editBtn.addEventListener('mouseenter',()=>{editBtn.style.color='var(--text)';editBtn.style.borderColor='var(--text)';});
+    editBtn.addEventListener('mouseleave',()=>{editBtn.style.color='var(--muted)';editBtn.style.borderColor='var(--border)';});
+    editBtn.addEventListener('click',()=>openRecurEdit(i));
+    item.appendChild(left);item.appendChild(editBtn);list.appendChild(item);
   });
 }
+
+function openRecurEdit(idx){
+  document.getElementById('recur-edit-overlay')?.remove();
+  const r=recurring[idx];
+  let editDays=[...r.days];
+
+  const overlay=document.createElement('div');overlay.className='recur-edit-overlay';overlay.id='recur-edit-overlay';
+  const box=document.createElement('div');box.className='recur-edit-box';
+
+  const title=document.createElement('div');title.className='recur-edit-title';title.textContent='Editar tarefa recorrente';
+  box.appendChild(title);
+
+  // Nome
+  const nameLbl=document.createElement('div');nameLbl.style.cssText='font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:500;margin-bottom:4px';nameLbl.textContent='Nome';
+  const nameInp=document.createElement('input');nameInp.style.cssText='border:none;border-bottom:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:13px;color:var(--text);outline:none;padding:4px 0;width:100%';nameInp.value=r.text;
+  const nameWrap=document.createElement('div');nameWrap.appendChild(nameLbl);nameWrap.appendChild(nameInp);
+  box.appendChild(nameWrap);
+
+  // Categoria
+  const catLbl=document.createElement('div');catLbl.style.cssText='font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:500;margin-bottom:4px';catLbl.textContent='Categoria';
+  const catSel=document.createElement('select');catSel.style.cssText='border:none;border-bottom:1px solid var(--border);background:transparent;font-family:var(--sans);font-size:13px;color:var(--text);outline:none;padding:4px 0;width:100%';
+  categories.forEach(cat=>{const opt=document.createElement('option');opt.value=cat;opt.textContent=cat;if(cat===r.category)opt.selected=true;catSel.appendChild(opt);});
+  const catWrap=document.createElement('div');catWrap.appendChild(catLbl);catWrap.appendChild(catSel);
+  box.appendChild(catWrap);
+
+  // Dias
+  const daysLbl=document.createElement('div');daysLbl.style.cssText='font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:500;margin-bottom:6px';daysLbl.textContent='Dias da semana';
+  const daysPicker=document.createElement('div');daysPicker.style.cssText='display:flex;gap:5px;flex-wrap:wrap';
+  DOW_SHORT.forEach((lbl,i)=>{
+    const btn=document.createElement('button');btn.className='dow-btn'+(editDays.includes(i)?' on':'');btn.textContent=lbl;btn.type='button';
+    btn.addEventListener('click',()=>{
+      const ix=editDays.indexOf(i);if(ix===-1)editDays.push(i);else editDays.splice(ix,1);btn.classList.toggle('on');
+    });
+    daysPicker.appendChild(btn);
+  });
+  const daysWrap=document.createElement('div');daysWrap.appendChild(daysLbl);daysWrap.appendChild(daysPicker);
+  box.appendChild(daysWrap);
+
+  // Ações
+  const actions=document.createElement('div');actions.className='recur-edit-actions';
+
+  const delBtn=document.createElement('button');delBtn.className='recur-edit-btn-del';delBtn.textContent='Excluir';
+  delBtn.addEventListener('click',async()=>{ await deleteRecurring(idx); overlay.remove(); });
+
+  const cancelBtn=document.createElement('button');cancelBtn.className='recur-edit-btn-cancel';cancelBtn.textContent='Cancelar';
+  cancelBtn.addEventListener('click',()=>overlay.remove());
+
+  const saveBtn=document.createElement('button');saveBtn.className='recur-edit-btn-save';saveBtn.textContent='Salvar';
+  saveBtn.addEventListener('click',async()=>{
+    const newName=nameInp.value.trim();
+    if(!newName){nameInp.focus();return;}
+    if(!editDays.length){alert('Selecione ao menos um dia.');return;}
+    await updateRecurring(idx,{...r,text:newName,category:catSel.value,days:[...editDays].sort()});
+    overlay.remove();
+  });
+
+  actions.appendChild(delBtn);actions.appendChild(cancelBtn);actions.appendChild(saveBtn);
+  box.appendChild(actions);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+  nameInp.focus();
+}
+
+async function deleteRecurring(idx){
+  const r=recurring[idx];
+  recurring.splice(idx,1);
+  await saveRecurring();
+  await sb.from('tasks').delete().eq('user_id',currentUser.id).eq('recur_id',r.id);
+  Object.keys(todayTasks).forEach(cat=>{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.recurId!==r.id);});
+  getWeekDates(weekOffset).forEach(date=>{
+    const key=toDateStr(date);
+    if(weekTasks[key]) Object.keys(weekTasks[key]).forEach(cat=>{weekTasks[key][cat]=(weekTasks[key][cat]||[]).filter(t=>t.recurId!==r.id);});
+  });
+  renderRecurList();renderHoje();renderWeekDayTasks();renderWeekCal();
+}
+
+async function updateRecurring(idx,updated){
+  const old=recurring[idx];
+  recurring[idx]=updated;
+  await saveRecurring();
+  await sb.from('tasks').delete().eq('user_id',currentUser.id).eq('recur_id',old.id);
+  Object.keys(todayTasks).forEach(cat=>{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.recurId!==old.id);});
+  getWeekDates(weekOffset).forEach(date=>{
+    const key=toDateStr(date);
+    if(weekTasks[key]) Object.keys(weekTasks[key]).forEach(cat=>{weekTasks[key][cat]=(weekTasks[key][cat]||[]).filter(t=>t.recurId!==old.id);});
+  });
+  injectRecurring();
+  renderRecurList();renderHoje();renderWeekDayTasks();renderWeekCal();
+}
+
 function addRecurring(){
   const nameVal=document.getElementById('recur-name').value.trim();
   const catVal=document.getElementById('recur-cat').value;
