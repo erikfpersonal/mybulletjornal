@@ -881,7 +881,15 @@ function makeCategoryBlock(cat,tasks,dayKey){
     }
     saveTask(t,cat,dateStr);
     inp.value='';list.insertBefore(makeTaskItem(cat,t,dayKey),addRow);
-    if(dayKey)renderWeekCal();
+    if(dayKey){
+      renderWeekCal();
+      if(isToday) renderHoje();
+    } else {
+      // Se a semana está mostrando hoje, atualiza a view da semana também
+      if(selectedWeekDay && selectedWeekDay.toDateString()===now.toDateString()){
+        renderWeekCal();
+      }
+    }
   });
   addRow.appendChild(dot);addRow.appendChild(inp);list.appendChild(addRow);block.appendChild(list);
   return block;
@@ -890,37 +898,58 @@ function makeCategoryBlock(cat,tasks,dayKey){
 function makeTaskItem(cat,task,dayKey){
   const row=document.createElement('div');row.className='task-item';row.dataset.tid=task.id;
   const handle=document.createElement('span');handle.className='drag-handle';handle.textContent='⠿';
+  const todayKey=toDateStr(now);
+  const isToday=dayKey===todayKey;
+
   const chk=document.createElement('div');chk.className='task-check'+(task.done?' done':'');
   chk.addEventListener('click',()=>{
     task.done=!task.done;chk.classList.toggle('done');txt.classList.toggle('done-text',task.done);
-    saveTask(task,cat,dayKey||toDateStr(now));
+    saveTask(task,cat,dayKey||todayKey);
+    // Sincroniza a outra view se for hoje
+    if(isToday) syncTodayAndWeek(cat,task.id,'done',task.done);
   });
+
   const txt=document.createElement('div');txt.className='task-text'+(task.done?' done-text':'');txt.contentEditable=true;txt.textContent=task.text;
   txt.addEventListener('blur',()=>{
     task.text=txt.textContent.trim()||task.text;
-    saveTask(task,cat,dayKey||toDateStr(now));
+    saveTask(task,cat,dayKey||todayKey);
+    if(isToday) syncTodayAndWeek(cat,task.id,'text',task.text);
   });
   txt.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();txt.blur();}});
+
   const del=document.createElement('button');del.className='task-del';del.textContent='×';
   del.addEventListener('click',()=>{
     deleteTask(task.id);
-    const todayKey=toDateStr(now);
     if(dayKey){
       if(weekTasks[dayKey]&&weekTasks[dayKey][cat])
         weekTasks[dayKey][cat]=(weekTasks[dayKey][cat]||[]).filter(t=>t.id!==task.id);
-      // Se é hoje, sincroniza todayTasks também
-      if(dayKey===todayKey)
+      if(isToday){
         todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);
+        renderHoje();
+      }
     } else {
       todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);
-      // Sincroniza weekTasks[hoje] também
       if(weekTasks[todayKey]&&weekTasks[todayKey][cat])
         weekTasks[todayKey][cat]=(weekTasks[todayKey][cat]||[]).filter(t=>t.id!==task.id);
+      if(selectedWeekDay&&selectedWeekDay.toDateString()===now.toDateString())
+        renderWeekDayTasks();
     }
     row.remove();
   });
+
   row.appendChild(handle);row.appendChild(chk);row.appendChild(txt);row.appendChild(del);makeDraggable(row);
   return row;
+}
+
+// Sincroniza todayTasks e weekTasks[hoje] quando a tarefa é de hoje
+function syncTodayAndWeek(cat, taskId, field, value){
+  const todayKey=toDateStr(now);
+  // Atualiza todayTasks
+  const tTask=todayTasks[cat]?.find(t=>t.id===taskId);
+  if(tTask) tTask[field]=value;
+  // Atualiza weekTasks[hoje]
+  const wTask=weekTasks[todayKey]?.[cat]?.find(t=>t.id===taskId);
+  if(wTask) wTask[field]=value;
 }
 
 // ═══════════════════════════════
