@@ -1619,7 +1619,7 @@ async function saveHabits(){
 
 // Tarefa individual (upsert)
 async function saveTask(task, category, dateStr){
-  await sb.from('tasks').upsert({
+  const { error } = await sb.from('tasks').upsert({
     id: task.id,
     user_id: currentUser.id,
     category,
@@ -1627,7 +1627,8 @@ async function saveTask(task, category, dateStr){
     done: task.done,
     task_date: dateStr,
     recur_id: task.recurId || null
-  }, { onConflict: 'id' });
+  });
+  if(error) console.error('saveTask error:', error.message);
 }
 
 // Deletar tarefa
@@ -1638,39 +1639,63 @@ async function deleteTask(taskId){
 // Habit log (toggle)
 async function saveHabitLog(habitName, dateISO, done){
   if(done){
-    await sb.from('habit_logs').upsert({ user_id: currentUser.id, habit_name: habitName, log_date: dateISO, done: true }, { onConflict: 'user_id,habit_name,log_date' });
+    const { error } = await sb.from('habit_logs').upsert(
+      { user_id: currentUser.id, habit_name: habitName, log_date: dateISO, done: true },
+      { onConflict: 'user_id,habit_name,log_date' }
+    );
+    if(error) console.error('saveHabitLog upsert error:', error.message);
   } else {
-    await sb.from('habit_logs').delete().eq('user_id', currentUser.id).eq('habit_name', habitName).eq('log_date', dateISO);
+    await sb.from('habit_logs').delete()
+      .eq('user_id', currentUser.id)
+      .eq('habit_name', habitName)
+      .eq('log_date', dateISO);
   }
 }
 
 // Sono (upsert)
 async function saveSleepLog(dateISO, dormir, acordar){
-  await sb.from('sleep_logs').upsert({
-    user_id: currentUser.id, log_date: dateISO,
-    sleep_time: dormir || null, wake_time: acordar || null
-  }, { onConflict: 'user_id,log_date' });
+  const { error } = await sb.from('sleep_logs').upsert(
+    { user_id: currentUser.id, log_date: dateISO, sleep_time: dormir || null, wake_time: acordar || null },
+    { onConflict: 'user_id,log_date' }
+  );
+  if(error) console.error('saveSleepLog error:', error.message);
 }
 
 // Gratidão (upsert)
 async function saveGratitude(dateISO, content){
   if(content){
-    await sb.from('gratitude').upsert({ user_id: currentUser.id, log_date: dateISO, content }, { onConflict: 'user_id,log_date' });
+    const { error } = await sb.from('gratitude').upsert(
+      { user_id: currentUser.id, log_date: dateISO, content },
+      { onConflict: 'user_id,log_date' }
+    );
+    if(error) console.error('saveGratitude error:', error.message);
   } else {
-    await sb.from('gratitude').delete().eq('user_id', currentUser.id).eq('log_date', dateISO);
+    await sb.from('gratitude').delete()
+      .eq('user_id', currentUser.id)
+      .eq('log_date', dateISO);
   }
 }
 
 // Diário (upsert)
 async function saveDiaryEntry(dateISO, entry){
-  await sb.from('diary').upsert({
-    user_id: currentUser.id, log_date: dateISO,
-    energia: entry.energia, humor: entry.humor,
-    aconteceu: entry.aconteceu, relevante: entry.relevante,
-    aprendizado: entry.aprendizado, padrao: entry.padrao,
-    acao: entry.acao, proxima_acao: entry.proximaAcao,
-    ideias_conteudo: entry.ideiasConteudo, ideias_negocio: entry.ideiasNegocio, ideias_mp: entry.ideiasMP
-  }, { onConflict: 'user_id,log_date' });
+  const { error } = await sb.from('diary').upsert(
+    {
+      user_id: currentUser.id, log_date: dateISO,
+      energia: entry.energia || 0,
+      humor: entry.humor || 0,
+      aconteceu: entry.aconteceu || '',
+      relevante: entry.relevante || '',
+      aprendizado: entry.aprendizado || '',
+      padrao: entry.padrao || '',
+      acao: entry.acao || '',
+      proxima_acao: entry.proximaAcao || '',
+      ideias_conteudo: entry.ideiasConteudo || '',
+      ideias_negocio: entry.ideiasNegocio || '',
+      ideias_mp: entry.ideiasMP || ''
+    },
+    { onConflict: 'user_id,log_date' }
+  );
+  if(error) console.error('saveDiaryEntry error:', error.message);
 }
 
 // Recorrentes
@@ -1678,13 +1703,15 @@ async function saveRecurring(){
   const uid = currentUser.id;
   await sb.from('recurring_tasks').delete().eq('user_id', uid);
   if(recurring.length){
-    await sb.from('recurring_tasks').insert(recurring.map(r => ({ id: r.id, user_id: uid, text: r.text, category: r.category, days: r.days })));
+    const { error } = await sb.from('recurring_tasks').insert(
+      recurring.map(r => ({ id: r.id, user_id: uid, text: r.text, category: r.category, days: r.days }))
+    );
+    if(error) console.error('saveRecurring error:', error.message);
   }
 }
 
-// ── PATCH: integrar savers nas funções existentes ──
-// Sobrescreve save() do localStorage com no-op (dados agora vão pro Supabase via funções específicas)
-function save(k, v){ /* dados salvos via Supabase */ }
+// ── PATCH: save() é no-op, dados vão pro Supabase via funções específicas ──
+function save(k, v){ /* no-op */ }
 
 init();
 </script>
