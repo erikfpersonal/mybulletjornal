@@ -739,30 +739,36 @@ function getWeekDates(offset){
 //  RECURRING INJECTION
 // ═══════════════════════════════
 function injectRecurring(){
-  const todayDow = now.getDay();
+  const todayStr=toDateStr(now);
+  const todayDow=now.getDay();
+
+  // Injeta no Hoje — só se não veio do banco
   recurring.forEach(r=>{
     if(!r.days.includes(todayDow)) return;
     const cat=r.category||(categories[0]||'Geral');
     if(!todayTasks[cat]) todayTasks[cat]=[];
-    if(!todayTasks[cat].find(t=>t.recurId===r.id)){
-      const t={id:uid(),recurId:r.id,text:r.text,done:false};
-      todayTasks[cat].push(t);
-      saveTask(t,cat,toDateStr(now));
-    }
+    // Checa se já existe pelo recurId (veio do banco via loadAllData)
+    if(todayTasks[cat].find(t=>t.recurId===r.id)) return;
+    // Não existe em memória — insere no banco e na memória
+    const t={id:uid(),recurId:r.id,text:r.text,done:false};
+    todayTasks[cat].push(t);
+    saveTask(t,cat,todayStr);
   });
+
+  // Injeta na Semana — pula hoje, só dias que não têm a tarefa
   getWeekDates(weekOffset).forEach(date=>{
+    const key=toDateStr(date);
+    if(key===todayStr) return;
     const dow=date.getDay();
-    const key=fmtDate(date.getFullYear(),date.getMonth(),date.getDate());
     if(!weekTasks[key]) weekTasks[key]={};
     recurring.forEach(r=>{
       if(!r.days.includes(dow)) return;
       const cat=r.category||(categories[0]||'Geral');
       if(!weekTasks[key][cat]) weekTasks[key][cat]=[];
-      if(!weekTasks[key][cat].find(t=>t.recurId===r.id)){
-        const t={id:uid(),recurId:r.id,text:r.text,done:false};
-        weekTasks[key][cat].push(t);
-        saveTask(t,cat,toDateStr(date));
-      }
+      if(weekTasks[key][cat].find(t=>t.recurId===r.id)) return;
+      const t={id:uid(),recurId:r.id,text:r.text,done:false};
+      weekTasks[key][cat].push(t);
+      saveTask(t,cat,key);
     });
   });
 }
@@ -866,18 +872,16 @@ function makeCategoryBlock(cat,tasks,dayKey){
     const dateStr=dayKey||todayKey;
     const isToday=dateStr===todayKey;
     if(dayKey){
+      // Adicionando na Semana
       if(!weekTasks[dayKey])weekTasks[dayKey]={};
       if(!weekTasks[dayKey][cat])weekTasks[dayKey][cat]=[];
       weekTasks[dayKey][cat].push(t);
-      // Se é hoje, sincroniza todayTasks
+      // Se é hoje, sincroniza todayTasks também
       if(isToday){if(!todayTasks[cat])todayTasks[cat]=[];todayTasks[cat].push(t);}
     } else {
+      // Adicionando no Hoje — só todayTasks, sem duplicar em weekTasks
       if(!todayTasks[cat])todayTasks[cat]=[];
       todayTasks[cat].push(t);
-      // Sincroniza weekTasks[hoje]
-      if(!weekTasks[todayKey])weekTasks[todayKey]={};
-      if(!weekTasks[todayKey][cat])weekTasks[todayKey][cat]=[];
-      weekTasks[todayKey][cat].push(t);
     }
     saveTask(t,cat,dateStr);
     inp.value='';list.insertBefore(makeTaskItem(cat,t,dayKey),addRow);
@@ -885,8 +889,7 @@ function makeCategoryBlock(cat,tasks,dayKey){
       renderWeekCal();
       if(isToday) renderHoje();
     } else {
-      // Se a semana está mostrando hoje, atualiza a view da semana também
-      if(selectedWeekDay && selectedWeekDay.toDateString()===now.toDateString()){
+      if(selectedWeekDay&&selectedWeekDay.toDateString()===now.toDateString()){
         renderWeekCal();
       }
     }
@@ -928,9 +931,8 @@ function makeTaskItem(cat,task,dayKey){
         renderHoje();
       }
     } else {
+      // Deletando do Hoje
       todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.id!==task.id);
-      if(weekTasks[todayKey]&&weekTasks[todayKey][cat])
-        weekTasks[todayKey][cat]=(weekTasks[todayKey][cat]||[]).filter(t=>t.id!==task.id);
       if(selectedWeekDay&&selectedWeekDay.toDateString()===now.toDateString())
         renderWeekDayTasks();
     }
@@ -941,15 +943,10 @@ function makeTaskItem(cat,task,dayKey){
   return row;
 }
 
-// Sincroniza todayTasks e weekTasks[hoje] quando a tarefa é de hoje
+// Sincroniza todayTasks quando a tarefa é de hoje
 function syncTodayAndWeek(cat, taskId, field, value){
-  const todayKey=toDateStr(now);
-  // Atualiza todayTasks
   const tTask=todayTasks[cat]?.find(t=>t.id===taskId);
   if(tTask) tTask[field]=value;
-  // Atualiza weekTasks[hoje]
-  const wTask=weekTasks[todayKey]?.[cat]?.find(t=>t.id===taskId);
-  if(wTask) wTask[field]=value;
 }
 
 // ═══════════════════════════════
@@ -1616,38 +1613,61 @@ function openRecurEdit(idx){
 
 async function deleteRecurring(idx){
   const r=recurring[idx];
-  recurring.splice(idx,1);
-  await saveRecurring();
-  await sb.from('tasks').delete().eq('user_id',currentUser.id).eq('recur_id',r.id);
-  Object.keys(todayTasks).forEach(cat=>{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.recurId!==r.id);});
+  // Remove do banco — só este recorrente
+  const { error: re } = await sb.from('recurring_tasks').delete().eq('id', r.id).eq('user_id', currentUser.id);
+  if(re){ console.error('deleteRecurring error:', re.message); return; }
+  // Remove as tasks geradas por ele
+  await sb.from('tasks').delete().eq('user_id', currentUser.id).eq('recur_id', r.id);
+  // Remove da memória local
+  recurring.splice(idx, 1);
+  Object.keys(todayTasks).forEach(cat=>{
+    todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.recurId!==r.id);
+  });
   getWeekDates(weekOffset).forEach(date=>{
     const key=toDateStr(date);
-    if(weekTasks[key]) Object.keys(weekTasks[key]).forEach(cat=>{weekTasks[key][cat]=(weekTasks[key][cat]||[]).filter(t=>t.recurId!==r.id);});
+    if(weekTasks[key]) Object.keys(weekTasks[key]).forEach(cat=>{
+      weekTasks[key][cat]=(weekTasks[key][cat]||[]).filter(t=>t.recurId!==r.id);
+    });
   });
-  renderRecurList();renderHoje();renderWeekDayTasks();renderWeekCal();
+  renderRecurList(); renderHoje(); renderWeekDayTasks(); renderWeekCal();
 }
 
-async function updateRecurring(idx,updated){
+async function updateRecurring(idx, updated){
   const old=recurring[idx];
   recurring[idx]=updated;
-  await saveRecurring();
-  await sb.from('tasks').delete().eq('user_id',currentUser.id).eq('recur_id',old.id);
-  Object.keys(todayTasks).forEach(cat=>{todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.recurId!==old.id);});
+  // Upsert só este recorrente
+  const { error } = await sb.from('recurring_tasks').upsert({
+    id: updated.id, user_id: currentUser.id,
+    text: updated.text, category: updated.category, days: updated.days
+  });
+  if(error){ console.error('updateRecurring error:', error.message); return; }
+  // Remove tasks antigas e reinjecta
+  await sb.from('tasks').delete().eq('user_id', currentUser.id).eq('recur_id', old.id);
+  Object.keys(todayTasks).forEach(cat=>{
+    todayTasks[cat]=(todayTasks[cat]||[]).filter(t=>t.recurId!==old.id);
+  });
   getWeekDates(weekOffset).forEach(date=>{
     const key=toDateStr(date);
-    if(weekTasks[key]) Object.keys(weekTasks[key]).forEach(cat=>{weekTasks[key][cat]=(weekTasks[key][cat]||[]).filter(t=>t.recurId!==old.id);});
+    if(weekTasks[key]) Object.keys(weekTasks[key]).forEach(cat=>{
+      weekTasks[key][cat]=(weekTasks[key][cat]||[]).filter(t=>t.recurId!==old.id);
+    });
   });
   injectRecurring();
-  renderRecurList();renderHoje();renderWeekDayTasks();renderWeekCal();
+  renderRecurList(); renderHoje(); renderWeekDayTasks(); renderWeekCal();
 }
 
-function addRecurring(){
+async function addRecurring(){
   const nameVal=document.getElementById('recur-name').value.trim();
   const catVal=document.getElementById('recur-cat').value;
   if(!nameVal){document.getElementById('recur-name').focus();return;}
   if(!recurDaysSel.length){alert('Selecione ao menos um dia.');return;}
   const r={id:uid(),text:nameVal,category:catVal,days:[...recurDaysSel].sort()};
-  recurring.push(r);saveRecurring();
+  // Insere só este no banco
+  const { error } = await sb.from('recurring_tasks').insert({
+    id: r.id, user_id: currentUser.id, text: r.text, category: r.category, days: r.days
+  });
+  if(error){ console.error('addRecurring error:', error.message); return; }
+  recurring.push(r);
   document.getElementById('recur-name').value='';
   recurDaysSel=[];initRecurPicker();renderRecurList();injectRecurring();renderHoje();
   if(selectedWeekDay)renderWeekDayTasks();
@@ -1940,15 +1960,15 @@ async function loadAllData(){
     allT.forEach(t => {
       const task = { id: t.id, text: t.text, done: t.done, recurId: t.recur_id };
 
-      // Semana — indexado por task_date
-      if(!weekTasks[t.task_date]) weekTasks[t.task_date] = {};
-      if(!weekTasks[t.task_date][t.category]) weekTasks[t.task_date][t.category] = [];
-      weekTasks[t.task_date][t.category].push(task);
-
-      // Hoje — só as de hoje
       if(t.task_date === todayStr){
+        // Hoje — só em todayTasks
         if(!todayTasks[t.category]) todayTasks[t.category] = [];
         todayTasks[t.category].push(task);
+      } else {
+        // Outros dias — só em weekTasks
+        if(!weekTasks[t.task_date]) weekTasks[t.task_date] = {};
+        if(!weekTasks[t.task_date][t.category]) weekTasks[t.task_date][t.category] = [];
+        weekTasks[t.task_date][t.category].push(task);
       }
     });
   }
@@ -2048,25 +2068,31 @@ async function saveHabits(){
   }
 }
 
-// Tarefa individual — insert ou update
 async function saveTask(task, category, dateStr){
-  const { data: existing } = await sb.from('tasks').select('id').eq('id', task.id).eq('user_id', currentUser.id).maybeSingle();
-  if(existing){
-    const { error } = await sb.from('tasks').update({
-      text: task.text, done: task.done, category, task_date: dateStr
-    }).eq('id', task.id).eq('user_id', currentUser.id);
-    if(error) console.error('saveTask update error:', error.message);
+  const payload = {
+    id: task.id,
+    user_id: currentUser.id,
+    category,
+    text: task.text,
+    done: task.done,
+    task_date: dateStr,
+    recur_id: task.recurId || null
+  };
+
+  if(task.recurId){
+    // Recorrente: upsert pela constraint única (user_id, recur_id, task_date)
+    const { error } = await sb.from('tasks').upsert(payload, { onConflict: 'user_id,recur_id,task_date' });
+    if(error) console.error('saveTask recur error:', error.message);
   } else {
-    const { error } = await sb.from('tasks').insert({
-      id: task.id,
-      user_id: currentUser.id,
-      category,
-      text: task.text,
-      done: task.done,
-      task_date: dateStr,
-      recur_id: task.recurId || null
-    });
-    if(error) console.error('saveTask insert error:', error.message);
+    // Normal: insert ou update pela PK
+    const { data: existing } = await sb.from('tasks').select('id').eq('id', task.id).eq('user_id', currentUser.id).maybeSingle();
+    if(existing){
+      const { error } = await sb.from('tasks').update({ text: task.text, done: task.done, category, task_date: dateStr }).eq('id', task.id).eq('user_id', currentUser.id);
+      if(error) console.error('saveTask update error:', error.message);
+    } else {
+      const { error } = await sb.from('tasks').insert(payload);
+      if(error) console.error('saveTask insert error:', error.message);
+    }
   }
 }
 
@@ -2140,20 +2166,20 @@ async function saveDiaryEntry(dateISO, entry){
 // Recorrentes
 async function saveRecurring(){
   const uid2 = currentUser.id;
-  await sb.from('recurring_tasks').delete().eq('user_id', uid2);
-  if(recurring.length){
-    const rows = recurring.map(r => ({
-      user_id: uid2,
-      text: r.text,
-      category: r.category,
-      days: r.days
-    }));
-    const { error } = await sb.from('recurring_tasks').insert(rows);
-    if(error) console.error('saveRecurring error:', error.message);
-    // Update local IDs with what Supabase assigned
-    const { data: fresh } = await sb.from('recurring_tasks').select('*').eq('user_id', uid2);
-    if(fresh) recurring = fresh.map(r => ({ id: r.id, text: r.text, category: r.category, days: r.days }));
+  if(!recurring.length){
+    await sb.from('recurring_tasks').delete().eq('user_id', uid2);
+    return;
   }
+  // Upsert preservando os IDs existentes
+  const rows = recurring.map(r => ({
+    id: r.id,
+    user_id: uid2,
+    text: r.text,
+    category: r.category,
+    days: r.days
+  }));
+  const { error } = await sb.from('recurring_tasks').upsert(rows);
+  if(error) console.error('saveRecurring error:', error.message);
 }
 
 // ── PATCH: save() é no-op, dados vão pro Supabase via funções específicas ──
